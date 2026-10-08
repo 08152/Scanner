@@ -27,8 +27,6 @@ RUN apt-get update && apt-get install -y \
     libjpeg-turbo8 \
     libpng16-16 \
     libtiff6 \
-    libopenexr-3-1-30 \
-    libopenimageio2.4 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt
@@ -37,28 +35,30 @@ RUN wget -O AliceVision.tar.gz \
     "https://github.com/alicevision/AliceVision/releases/download/nightly/AliceVision-nightly-20261008-73b9f34c-linux.tar.gz" \
     && mkdir -p /opt/AliceVision \
     && tar -xzf AliceVision.tar.gz -C /opt/AliceVision \
-    && rm AliceVision.tar.gz \
-    && echo "=== ALICEVISION DATEIEN ===" \
-    && find /opt/AliceVision -type f -name "aliceVision_cameraInit*" -print \
-    && echo "=== BIN ===" \
-    && find /opt/AliceVision -type d -name "bin" -print
+    && rm AliceVision.tar.gz
 
-RUN AV_BIN="$(find /opt/AliceVision -type f -name "aliceVision_cameraInit" -executable | head -n 1)" \
-    && test -n "$AV_BIN" \
-    && AV_ROOT="$(dirname "$(dirname "$AV_BIN")")" \
-    && echo "ALICEVISION ROOT: $AV_ROOT" \
-    && ln -s "$AV_ROOT" /opt/AliceVisionCurrent \
-    && chmod -R a+rx "$AV_ROOT/bin"
+RUN echo "=== ALICEVISION ===" \
+    && find /opt/AliceVision \
+    -type f \
+    -name "aliceVision_cameraInit*" \
+    -print
 
-ENV ALICEVISION_INSTALL=/opt/AliceVisionCurrent
-ENV PATH=/opt/AliceVisionCurrent/bin:$PATH
-ENV LD_LIBRARY_PATH=/opt/AliceVisionCurrent/lib:/opt/AliceVisionCurrent/lib64:$LD_LIBRARY_PATH
-ENV ALICEVISION_SENSOR_DB=/opt/AliceVisionCurrent/share/aliceVision/cameraSensors.db
+RUN AV_ROOT="$(dirname "$(find /opt/AliceVision -type f -name 'aliceVision_cameraInit*' | head -n 1)")" \
+    && echo "BIN: $AV_ROOT" \
+    && mkdir -p /opt/AliceVision/bin \
+    && for FILE in "$AV_ROOT"/aliceVision_*; do \
+        NAME="$(basename "$FILE")"; \
+        CLEAN="$(echo "$NAME" | sed -E 's/-[0-9]+(\.[0-9]+)+$//')"; \
+        ln -sf "$FILE" "/opt/AliceVision/bin/$CLEAN"; \
+        done
 
-RUN echo "=== TEST ===" \
+ENV ALICEVISION_INSTALL=/opt/AliceVision
+ENV PATH=/opt/AliceVision/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/AliceVision/AV_bundle/lib:/opt/AliceVision/AV_bundle/lib64:$LD_LIBRARY_PATH
+
+RUN echo "=== TEST ALICEVISION ===" \
+    && ls -la /opt/AliceVision/bin \
     && which aliceVision_cameraInit \
-    && ls -l "$(which aliceVision_cameraInit)" \
-    && file "$(which aliceVision_cameraInit)" \
     && aliceVision_cameraInit --help >/dev/null
 
 WORKDIR /app
