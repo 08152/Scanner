@@ -1,276 +1,543 @@
 <!DOCTYPE html>
 <html lang="de">
-
 <head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    >
 
-<meta charset="UTF-8">
+    <title>3D Scanner</title>
 
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
-<title>Ultra 3D Scanner</title>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            font-family: Arial, sans-serif;
+            background: #101114;
+            color: white;
+        }
 
-<style>
+        body {
+            padding: 20px;
+        }
 
-* {
-    box-sizing: border-box;
-}
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: auto;
+        }
 
-body {
-    margin: 0;
-    background: #080808;
-    color: white;
-    font-family: Arial, sans-serif;
-}
+        h1 {
+            text-align: center;
+            font-size: clamp(28px, 6vw, 48px);
+            margin: 10px 0;
+        }
 
-.container {
-    width: min(900px, 94%);
-    margin: auto;
-    padding: 35px 0;
-}
+        .subtitle {
+            text-align: center;
+            color: #aaa;
+            margin-bottom: 25px;
+        }
 
-h1 {
-    text-align: center;
-    font-size: 36px;
-}
+        .card {
+            background: #191b20;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 30px rgba(0,0,0,.25);
+        }
 
-.subtitle {
-    text-align: center;
-    color: #999;
-    margin-bottom: 30px;
-}
+        #dropArea {
+            border: 3px dashed #555;
+            border-radius: 18px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: .2s;
+            user-select: none;
+        }
 
-.card {
-    background: #151515;
-    border: 1px solid #292929;
-    border-radius: 18px;
-    padding: 25px;
-    margin-bottom: 20px;
-}
+        #dropArea:hover,
+        #dropArea.drag {
+            border-color: #fff;
+            background: #22242a;
+        }
 
-input[type="file"] {
-    width: 100%;
-    padding: 15px;
-    background: #222;
-    color: white;
-    border-radius: 10px;
-    border: 1px solid #444;
-}
+        .upload-icon {
+            font-size: 55px;
+            margin-bottom: 10px;
+        }
 
-button {
-    width: 100%;
-    margin-top: 20px;
-    padding: 17px;
-    border: none;
-    border-radius: 10px;
-    background: white;
-    color: black;
-    font-size: 17px;
-    font-weight: bold;
-}
+        .upload-title {
+            font-size: 22px;
+            font-weight: bold;
+        }
 
-button:disabled {
-    opacity: 0.4;
-}
+        .upload-text {
+            color: #aaa;
+            margin-top: 8px;
+        }
 
-.stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 20px;
-}
+        #photos {
+            display: none;
+        }
 
-.stat {
-    background: #202020;
-    padding: 15px;
-    border-radius: 10px;
-}
+        button {
+            width: 100%;
+            min-height: 58px;
+            border: 0;
+            border-radius: 15px;
+            background: white;
+            color: black;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            touch-action: manipulation;
+        }
 
-.value {
-    font-size: 21px;
-    font-weight: bold;
-    margin-top: 5px;
-}
+        button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
 
-#status {
-    text-align: center;
-    color: #bbb;
-}
+        #photoList {
+            margin-top: 15px;
+            color: #bbb;
+            word-break: break-word;
+        }
 
-.progress {
-    height: 12px;
-    background: #292929;
-    border-radius: 20px;
-    margin-top: 15px;
-    overflow: hidden;
-}
+        .status {
+            font-size: 18px;
+            line-height: 1.5;
+        }
 
-#bar {
-    width: 0%;
-    height: 100%;
-    background: white;
-    transition: width .3s;
-}
+        .progress {
+            width: 100%;
+            height: 15px;
+            background: #303238;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
 
-@media(max-width:600px) {
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: white;
+            transition: width .4s;
+        }
 
-    .stats {
-        grid-template-columns: 1fr;
-    }
+        #viewerCard {
+            display: none;
+        }
 
-}
+        #viewer {
+            width: 100%;
+            height: min(65vh, 600px);
+            min-height: 350px;
+            background: #08090b;
+            border-radius: 18px;
+            overflow: hidden;
+            position: relative;
+            touch-action: none;
+        }
 
-</style>
+        #modelViewer {
+            width: 100%;
+            height: 100%;
+            background: #08090b;
+        }
 
+        .viewer-help {
+            text-align: center;
+            color: #999;
+            margin-top: 12px;
+        }
+
+        .download {
+            display: block;
+            width: 100%;
+            min-height: 58px;
+            padding: 17px;
+            margin-top: 12px;
+            background: white;
+            color: black;
+            text-decoration: none;
+            text-align: center;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .info {
+            background: #23252b;
+            padding: 15px;
+            border-radius: 14px;
+            text-align: center;
+        }
+
+        .info strong {
+            display: block;
+            font-size: 20px;
+        }
+
+        .info span {
+            color: #999;
+            font-size: 13px;
+        }
+
+        .error {
+            color: #ff7777;
+        }
+
+        .success {
+            color: #8cff9b;
+        }
+
+        @media (max-width: 600px) {
+
+            body {
+                padding: 10px;
+            }
+
+            .card {
+                padding: 15px;
+                border-radius: 16px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #dropArea {
+                padding: 30px 15px;
+            }
+
+            #viewer {
+                min-height: 300px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
 <div class="container">
 
-<h1>Ultra 3D Scanner</h1>
+    <h1>3D Scanner</h1>
 
-<div class="subtitle">
-Fotos → hochauflösendes 3D-Modell
+    <div class="subtitle">
+        Fotos hochladen → 3D-Modell berechnen → ansehen → herunterladen
+    </div>
+
+
+    <div class="card">
+
+        <div class="info-grid">
+
+            <div class="info">
+                <strong>100</strong>
+                <span>Fotos maximal</span>
+            </div>
+
+            <div class="info">
+                <strong>30K</strong>
+                <span>Textur-Ziel</span>
+            </div>
+
+            <div class="info">
+                <strong>750M</strong>
+                <span>Mesh-Ziel</span>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="card">
+
+        <label id="dropArea" for="photos">
+
+            <div class="upload-icon">
+                📷
+            </div>
+
+            <div class="upload-title">
+                Fotos auswählen
+            </div>
+
+            <div class="upload-text">
+                50–100 Fotos sind ideal
+                <br>
+                Du kannst sie auch hier hineinziehen.
+            </div>
+
+        </label>
+
+        <input
+            id="photos"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+        >
+
+        <div id="photoList">
+            Noch keine Fotos ausgewählt.
+        </div>
+
+        <button id="createButton" disabled>
+            3D-MODELL ERSTELLEN
+        </button>
+
+    </div>
+
+
+    <div class="card">
+
+        <div class="status" id="status">
+            Bereit für den Upload.
+        </div>
+
+        <div class="progress">
+            <div
+                id="progressBar"
+                class="progress-bar"
+            ></div>
+        </div>
+
+    </div>
+
+
+    <div
+        id="viewerCard"
+        class="card"
+    >
+
+        <h2>3D-Vorschau</h2>
+
+        <div id="viewer">
+
+            <model-viewer
+                id="modelViewer"
+                camera-controls
+                touch-action="pan-y"
+                auto-rotate
+                shadow-intensity="1"
+                exposure="1"
+                environment-image="neutral"
+                loading="eager"
+            >
+            </model-viewer>
+
+        </div>
+
+        <div class="viewer-help">
+            Mit einem Finger drehen · mit zwei Fingern zoomen
+        </div>
+
+    </div>
+
+
+    <div
+        id="downloads"
+        class="card"
+        style="display:none;"
+    >
+
+        <h2>Modell herunterladen</h2>
+
+        <div id="downloadList"></div>
+
+    </div>
+
 </div>
 
-<div class="card">
 
-<h2>Fotos</h2>
+<script
+    type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
+></script>
 
-<input
-    id="photos"
-    type="file"
-    accept="image/jpeg,image/png,image/webp"
-    multiple
->
-
-<p id="count">
-0 Fotos ausgewählt
-</p>
-
-<div class="stats">
-
-<div class="stat">
-Maximale Textur
-<div class="value">
-30K × 30K
-</div>
-</div>
-
-<div class="stat">
-Mesh-Ziel
-<div class="value">
-750 Mio.
-</div>
-</div>
-
-</div>
-
-<button id="start">
-3D-MODELL ERSTELLEN
-</button>
-
-</div>
-
-<div class="card">
-
-<div id="status">
-Bereit.
-</div>
-
-<div class="progress">
-<div id="bar"></div>
-</div>
-
-</div>
-
-</div>
 
 <script>
 
-const photos =
+const photosInput =
     document.getElementById("photos");
 
-const count =
-    document.getElementById("count");
+const dropArea =
+    document.getElementById("dropArea");
 
-const start =
-    document.getElementById("start");
+const createButton =
+    document.getElementById("createButton");
 
-const status =
+const photoList =
+    document.getElementById("photoList");
+
+const statusElement =
     document.getElementById("status");
 
-const bar =
-    document.getElementById("bar");
+const progressBar =
+    document.getElementById("progressBar");
+
+const viewerCard =
+    document.getElementById("viewerCard");
+
+const modelViewer =
+    document.getElementById("modelViewer");
+
+const downloads =
+    document.getElementById("downloads");
+
+const downloadList =
+    document.getElementById("downloadList");
 
 
-photos.addEventListener(
+let selectedFiles = [];
+let currentScanId = null;
+
+
+/* --------------------------------
+   Dateien auswählen
+-------------------------------- */
+
+photosInput.addEventListener(
     "change",
     () => {
 
-        const amount =
-            photos.files.length;
+        selectedFiles =
+            Array.from(photosInput.files);
 
-        count.textContent =
-            amount + " Fotos ausgewählt";
-
-        if (amount > 100) {
-
-            count.textContent =
-                "Maximal 100 Fotos erlaubt.";
-
-            start.disabled = true;
-
-            return;
-        }
-
-        if (amount < 3) {
-
-            count.textContent =
-                amount +
-                " Fotos – mindestens 3 benötigt.";
-
-            start.disabled = true;
-
-            return;
-        }
-
-        start.disabled = false;
-
+        updateFileList();
     }
 );
 
 
-start.addEventListener(
+/* --------------------------------
+   Drag & Drop
+-------------------------------- */
+
+dropArea.addEventListener(
+    "dragover",
+    event => {
+
+        event.preventDefault();
+
+        dropArea.classList.add("drag");
+    }
+);
+
+dropArea.addEventListener(
+    "dragleave",
+    () => {
+
+        dropArea.classList.remove("drag");
+    }
+);
+
+dropArea.addEventListener(
+    "drop",
+    event => {
+
+        event.preventDefault();
+
+        dropArea.classList.remove("drag");
+
+        selectedFiles =
+            Array.from(event.dataTransfer.files)
+                .filter(file =>
+                    file.type.startsWith("image/")
+                )
+                .slice(0, 100);
+
+        updateFileList();
+    }
+);
+
+
+/* --------------------------------
+   Dateiliste
+-------------------------------- */
+
+function updateFileList() {
+
+    const count =
+        selectedFiles.length;
+
+    if (count === 0) {
+
+        photoList.textContent =
+            "Noch keine Fotos ausgewählt.";
+
+        createButton.disabled = true;
+
+        return;
+    }
+
+    photoList.textContent =
+        `${count} Fotos ausgewählt.`;
+
+    createButton.disabled =
+        count < 3;
+}
+
+
+/* --------------------------------
+   Modell erstellen
+-------------------------------- */
+
+createButton.addEventListener(
     "click",
     async () => {
 
-        if (!photos.files.length) {
+        if (selectedFiles.length < 3) {
+
+            alert(
+                "Bitte mindestens 3 Fotos auswählen."
+            );
+
             return;
         }
 
-        start.disabled = true;
+        createButton.disabled = true;
 
-        status.textContent =
+        downloads.style.display =
+            "none";
+
+        viewerCard.style.display =
+            "none";
+
+        progressBar.style.width =
+            "5%";
+
+        statusElement.textContent =
             "Fotos werden hochgeladen...";
 
-        bar.style.width = "10%";
 
-        const form =
+        const formData =
             new FormData();
 
-        for (
-            const file of photos.files
-        ) {
+        for (const file of selectedFiles) {
 
-            form.append(
+            formData.append(
                 "photos",
                 file
             );
         }
+
 
         try {
 
@@ -279,46 +546,265 @@ start.addEventListener(
                     "/api/scan",
                     {
                         method: "POST",
-                        body: form
+                        body: formData
                     }
                 );
 
-            const result =
+
+            const data =
                 await response.json();
 
+
             if (!response.ok) {
+
                 throw new Error(
-                    result.error ||
+                    data.error ||
                     "Upload fehlgeschlagen."
                 );
             }
 
-            bar.style.width = "100%";
 
-            status.innerHTML =
-                `
-                <strong>Upload abgeschlossen.</strong><br>
-                ${result.photos} Fotos wurden übertragen.<br><br>
-                Scan-ID:<br>
-                ${result.scanId}
-                `;
+            currentScanId =
+                data.scanId;
+
+
+            progressBar.style.width =
+                "10%";
+
+
+            statusElement.textContent =
+                "Upload fertig. 3D-Berechnung gestartet.";
+
+
+            checkStatus();
 
         } catch (error) {
 
-            status.textContent =
-                "Fehler: " +
-                error.message;
+            statusElement.innerHTML =
+                `<span class="error">${escapeHtml(error.message)}</span>`;
 
-            bar.style.width = "0%";
-
-            start.disabled = false;
+            createButton.disabled = false;
         }
-
     }
 );
+
+
+/* --------------------------------
+   Status abfragen
+-------------------------------- */
+
+async function checkStatus() {
+
+    if (!currentScanId) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/status/${currentScanId}`
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Status konnte nicht gelesen werden."
+            );
+        }
+
+
+        updateProgress(data);
+
+
+        if (data.status === "finished") {
+
+            await showFinishedModel(data);
+
+            return;
+        }
+
+
+        if (data.status === "error") {
+
+            statusElement.innerHTML =
+                `<span class="error">
+                    Fehler: ${escapeHtml(data.message)}
+                </span>`;
+
+            createButton.disabled = false;
+
+            return;
+        }
+
+
+        setTimeout(
+            checkStatus,
+            3000
+        );
+
+
+    } catch (error) {
+
+        statusElement.innerHTML =
+            `<span class="error">
+                ${escapeHtml(error.message)}
+            </span>`;
+
+        setTimeout(
+            checkStatus,
+            5000
+        );
+    }
+}
+
+
+/* --------------------------------
+   Fortschritt
+-------------------------------- */
+
+function updateProgress(data) {
+
+    const message =
+        data.message || "Berechnung läuft...";
+
+    statusElement.textContent =
+        message;
+
+
+    const text =
+        message.toLowerCase();
+
+
+    let percent = 15;
+
+
+    if (text.includes("feature")) {
+        percent = 25;
+    }
+
+    if (text.includes("kamera")) {
+        percent = 35;
+    }
+
+    if (text.includes("geometrie")) {
+        percent = 55;
+    }
+
+    if (text.includes("oberfläche")) {
+        percent = 75;
+    }
+
+    if (text.includes("textur")) {
+        percent = 90;
+    }
+
+    if (data.status === "finished") {
+        percent = 100;
+    }
+
+
+    progressBar.style.width =
+        `${percent}%`;
+}
+
+
+/* --------------------------------
+   Fertiges Modell
+-------------------------------- */
+
+async function showFinishedModel(data) {
+
+    progressBar.style.width =
+        "100%";
+
+
+    statusElement.innerHTML =
+        `<span class="success">
+            ✅ 3D-Modell fertig!
+        </span>`;
+
+
+    if (!data.files) {
+        return;
+    }
+
+
+    const glb =
+        data.files.find(
+            file =>
+                file.toLowerCase().endsWith(".glb")
+        );
+
+
+    if (glb) {
+
+        modelViewer.src =
+            `/api/download/${currentScanId}/${encodeURIComponent(glb)}`;
+
+        viewerCard.style.display =
+            "block";
+    }
+
+
+    downloads.style.display =
+        "block";
+
+    downloadList.innerHTML =
+        "";
+
+
+    for (const file of data.files) {
+
+        const link =
+            document.createElement("a");
+
+
+        link.className =
+            "download";
+
+
+        link.href =
+            `/api/download/${currentScanId}/${encodeURIComponent(file)}`;
+
+
+        link.download =
+            file.split("/").pop();
+
+
+        link.textContent =
+            `⬇️ ${file.split("/").pop()}`;
+
+
+        downloadList.appendChild(
+            link
+        );
+    }
+}
+
+
+/* --------------------------------
+   Sicherheit
+-------------------------------- */
+
+function escapeHtml(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
 
 </script>
 
 </body>
-
 </html>
