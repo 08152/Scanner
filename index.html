@@ -12,102 +12,131 @@
     <style>
         * {
             box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
         }
 
         html,
         body {
-            margin: 0;
             width: 100%;
             height: 100%;
+            margin: 0;
             overflow: hidden;
-            background: #0b0b0d;
-            color: white;
             font-family: Arial, sans-serif;
+            background: #08090c;
+            color: #ffffff;
         }
 
         body {
-            display: flex;
-            flex-direction: column;
+            display: grid;
+            grid-template-rows: 60px minmax(0, 1fr);
         }
 
         header {
-            padding: 14px;
-            border-bottom: 1px solid #242428;
-            background: #111114;
+            width: 100%;
+            height: 60px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 10px;
-            z-index: 10;
+            padding: 0 16px;
+            border-bottom: 1px solid #25272d;
+            background: #101217;
         }
 
-        header h1 {
-            margin: 0;
-            font-size: 18px;
+        .brand {
+            font-size: 19px;
+            font-weight: 700;
+            white-space: nowrap;
         }
 
         #status {
+            max-width: 55%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
             font-size: 13px;
-            opacity: 0.8;
-            text-align: right;
+            color: #b8bcc4;
         }
 
         main {
-            position: relative;
-            flex: 1;
             min-height: 0;
+            min-width: 0;
+            display: grid;
+            grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+            gap: 12px;
+            padding: 12px;
+        }
+
+        .panel {
+            min-width: 0;
+            min-height: 0;
+            overflow: auto;
+            padding: 14px;
+            border: 1px solid #262930;
+            border-radius: 16px;
+            background: #111318;
+        }
+
+        .viewer {
+            min-width: 0;
+            min-height: 0;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #262930;
+            border-radius: 16px;
+            background: #050608;
         }
 
         #canvas {
             width: 100%;
             height: 100%;
             display: block;
-            background: #050507;
             touch-action: none;
         }
 
-        .panel {
-            position: absolute;
-            left: 12px;
-            top: 12px;
-            width: min(390px, calc(100% - 24px));
-            padding: 14px;
-            background: rgba(17, 17, 20, 0.94);
-            border: 1px solid #29292e;
-            border-radius: 16px;
-            backdrop-filter: blur(12px);
-            z-index: 5;
-        }
-
         .drop {
-            border: 2px dashed #404047;
-            border-radius: 14px;
-            padding: 20px 12px;
+            width: 100%;
+            min-height: 130px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
             text-align: center;
+            border: 2px dashed #41454f;
+            border-radius: 14px;
+            background: #0d0f13;
             cursor: pointer;
-            margin-bottom: 12px;
         }
 
         .drop.active {
-            border-color: #fff;
+            border-color: #ffffff;
+            background: #161922;
         }
 
         input[type="file"] {
             display: none;
         }
 
-        button,
-        select {
+        .section {
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 12px;
+            color: #a9adb5;
+        }
+
+        select,
+        button {
             width: 100%;
             min-height: 44px;
-            border: 0;
+            border: 1px solid #30343c;
             border-radius: 12px;
-            margin-top: 8px;
             padding: 10px 12px;
-            font-size: 15px;
-            background: #232329;
-            color: white;
+            background: #1a1d23;
+            color: #ffffff;
+            font-size: 14px;
         }
 
         button {
@@ -119,158 +148,275 @@
             cursor: default;
         }
 
-        .row {
+        .two {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 8px;
         }
 
-        .progress {
-            height: 8px;
+        .info {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #22252c;
+            border-radius: 12px;
+            background: #0b0d11;
+        }
+
+        .infoLine {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .infoLine span:first-child {
+            color: #9297a0;
+        }
+
+        .infoLine span:last-child {
+            text-align: right;
+            overflow-wrap: anywhere;
+        }
+
+        .progressWrap {
+            width: 100%;
             margin-top: 12px;
-            background: #25252a;
-            border-radius: 999px;
+        }
+
+        .progress {
+            width: 100%;
+            height: 9px;
             overflow: hidden;
+            border-radius: 999px;
+            background: #25282e;
         }
 
         #progressBar {
             width: 0%;
             height: 100%;
-            background: white;
-            transition: width 0.2s linear;
+            background: #ffffff;
+            transition: width 0.12s linear;
         }
 
         #progressText {
-            margin-top: 8px;
-            font-size: 13px;
-        }
-
-        #filesText {
-            margin-top: 8px;
-            font-size: 13px;
-            opacity: 0.75;
+            margin-top: 7px;
+            font-size: 12px;
+            color: #b7bbc3;
         }
 
         #log {
+            width: 100%;
+            height: 150px;
             margin-top: 12px;
-            height: 130px;
-            overflow: auto;
             padding: 10px;
-            border-radius: 10px;
-            background: #09090b;
-            color: #bfc0c6;
-            font-family: Consolas, monospace;
-            font-size: 11px;
+            overflow: auto;
+            border: 1px solid #20242a;
+            border-radius: 12px;
+            background: #07080b;
+            color: #afb4bd;
+            font: 11px/1.45 Consolas, monospace;
             white-space: pre-wrap;
         }
 
-        .small {
-            font-size: 11px;
-            opacity: 0.6;
-            margin-top: 8px;
+        .viewerTop {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            right: 12px;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            pointer-events: none;
         }
 
-        @media (max-width: 600px) {
-            .panel {
-                top: auto;
-                bottom: 12px;
+        .badge {
+            padding: 8px 10px;
+            border: 1px solid #2b2f37;
+            border-radius: 10px;
+            background: rgba(11, 13, 17, 0.82);
+            font-size: 12px;
+            color: #c7cad0;
+            backdrop-filter: blur(8px);
+        }
+
+        .hint {
+            width: 100%;
+            margin-top: 10px;
+            font-size: 11px;
+            line-height: 1.45;
+            color: #7f848d;
+        }
+
+        @media (max-width: 820px) {
+            body {
+                grid-template-rows: 56px minmax(0, 1fr);
             }
 
-            #log {
-                height: 100px;
+            header {
+                height: 56px;
+            }
+
+            main {
+                grid-template-columns: 1fr;
+                grid-template-rows: minmax(0, 1fr) auto;
+            }
+
+            .viewer {
+                min-height: 45vh;
+            }
+
+            .panel {
+                max-height: 50vh;
             }
         }
     </style>
 </head>
 
 <body>
+    <header>
+        <div class="brand">3D Fotoscanner</div>
+        <div id="status">Bereit</div>
+    </header>
 
-<header>
-    <h1>3D Fotoscanner</h1>
-    <div id="status">Bereit</div>
-</header>
-
-<main>
-    <canvas id="canvas"></canvas>
-
-    <section class="panel">
-
-        <label
-            class="drop"
-            id="dropZone"
-            for="photos"
-        >
-            Fotos auswählen<br>
-            <span class="small">
-                20–200 überlappende Bilder
-            </span>
-        </label>
-
-        <input
-            id="photos"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-        >
-
-        <div id="filesText">
-            Keine Bilder ausgewählt
-        </div>
-
-        <select id="quality">
-            <option value="draft">Draft</option>
-            <option value="showcase" selected>Showcase</option>
-            <option value="ultra">Ultra</option>
-        </select>
-
-        <div class="row">
-            <button id="startButton">
-                Scan starten
-            </button>
-
-            <button
-                id="pauseButton"
-                disabled
+    <main>
+        <aside class="panel">
+            <label
+                class="drop"
+                id="dropZone"
+                for="photoInput"
             >
-                Pause
-            </button>
-        </div>
+                <div>
+                    <strong>Fotos auswählen</strong>
+                    <br>
+                    <span>
+                        2–200 Bilder
+                    </span>
+                </div>
+            </label>
 
-        <button
-            id="finishButton"
-            disabled
-        >
-            Jetzt beenden & exportieren
-        </button>
+            <input
+                id="photoInput"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+            >
 
-        <button
-            id="downloadButton"
-            disabled
-        >
-            PLY herunterladen
-        </button>
+            <div class="section">
+                <div class="info">
+                    <div class="infoLine">
+                        <span>Fotos</span>
+                        <span id="photoCount">0</span>
+                    </div>
 
-        <div class="progress">
-            <div id="progressBar"></div>
-        </div>
+                    <div class="infoLine">
+                        <span>Renderziel</span>
+                        <span>120 FPS</span>
+                    </div>
 
-        <div id="progressText">
-            0%
-        </div>
+                    <div class="infoLine">
+                        <span>Texturziel</span>
+                        <span>30K</span>
+                    </div>
 
-        <div id="log"></div>
+                    <div class="infoLine">
+                        <span>Meshziel</span>
+                        <span>750M</span>
+                    </div>
+                </div>
+            </div>
 
-        <div class="small">
-            Die Verarbeitung läuft im Browser.
-        </div>
+            <div class="section">
+                <span class="label">
+                    Qualitätsstufe
+                </span>
 
-    </section>
-</main>
+                <select id="quality">
+                    <option value="draft">
+                        Draft
+                    </option>
 
-<script
-    type="module"
-    src="./app.js"
-></script>
+                    <option
+                        value="high"
+                        selected
+                    >
+                        High
+                    </option>
 
+                    <option value="ultra">
+                        Ultra
+                    </option>
+                </select>
+            </div>
+
+            <div class="section two">
+                <button
+                    id="startButton"
+                >
+                    Scan starten
+                </button>
+
+                <button
+                    id="resetButton"
+                >
+                    Zurücksetzen
+                </button>
+            </div>
+
+            <div class="section">
+                <button
+                    id="exportButton"
+                    disabled
+                >
+                    Modell exportieren
+                </button>
+            </div>
+
+            <div class="progressWrap">
+                <div class="progress">
+                    <div id="progressBar"></div>
+                </div>
+
+                <div id="progressText">
+                    0%
+                </div>
+            </div>
+
+            <div id="log"></div>
+
+            <div class="hint">
+                Die Oberfläche und die 3D-Vorschau laufen direkt im Browser.
+                GitHub Pages kann diese statische Anwendung ausliefern.
+            </div>
+        </aside>
+
+        <section class="viewer">
+            <div class="viewerTop">
+                <div
+                    class="badge"
+                    id="fpsBadge"
+                >
+                    0 FPS
+                </div>
+
+                <div
+                    class="badge"
+                    id="modelBadge"
+                >
+                    Kein Modell
+                </div>
+            </div>
+
+            <canvas id="canvas"></canvas>
+        </section>
+    </main>
+
+    <script
+        type="module"
+        src="./app.js"
+    ></script>
 </body>
 </html>
