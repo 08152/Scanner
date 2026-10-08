@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>Ultra 3D Scanner</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #080808;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.container {
+    width: min(900px, 94%);
+    margin: auto;
+    padding: 35px 0;
+}
+
+h1 {
+    text-align: center;
+    font-size: 36px;
+}
+
+.subtitle {
+    text-align: center;
+    color: #999;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: #151515;
+    border: 1px solid #292929;
+    border-radius: 18px;
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+input[type="file"] {
+    width: 100%;
+    padding: 15px;
+    background: #222;
+    color: white;
+    border-radius: 10px;
+    border: 1px solid #444;
+}
+
+button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 17px;
+    border: none;
+    border-radius: 10px;
+    background: white;
+    color: black;
+    font-size: 17px;
+    font-weight: bold;
+}
+
+button:disabled {
+    opacity: 0.4;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.stat {
+    background: #202020;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.value {
+    font-size: 21px;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+#status {
+    text-align: center;
+    color: #bbb;
+}
+
+.progress {
+    height: 12px;
+    background: #292929;
+    border-radius: 20px;
+    margin-top: 15px;
+    overflow: hidden;
+}
+
+#bar {
+    width: 0%;
+    height: 100%;
+    background: white;
+    transition: width .3s;
+}
+
+@media(max-width:600px) {
+
+    .stats {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Ultra 3D Scanner</h1>
+
+<div class="subtitle">
+Fotos → hochauflösendes 3D-Modell
+</div>
+
+<div class="card">
+
+<h2>Fotos</h2>
+
+<input
+    id="photos"
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    multiple
+>
+
+<p id="count">
+0 Fotos ausgewählt
+</p>
+
+<div class="stats">
+
+<div class="stat">
+Maximale Textur
+<div class="value">
+30K × 30K
+</div>
+</div>
+
+<div class="stat">
+Mesh-Ziel
+<div class="value">
+750 Mio.
+</div>
+</div>
+
+</div>
+
+<button id="start">
+3D-MODELL ERSTELLEN
+</button>
+
+</div>
+
+<div class="card">
+
+<div id="status">
+Bereit.
+</div>
+
+<div class="progress">
+<div id="bar"></div>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+const photos =
+    document.getElementById("photos");
+
+const count =
+    document.getElementById("count");
+
+const start =
+    document.getElementById("start");
+
+const status =
+    document.getElementById("status");
+
+const bar =
+    document.getElementById("bar");
+
+
+photos.addEventListener(
+    "change",
+    () => {
+
+        const amount =
+            photos.files.length;
+
+        count.textContent =
+            amount + " Fotos ausgewählt";
+
+        if (amount > 100) {
+
+            count.textContent =
+                "Maximal 100 Fotos erlaubt.";
+
+            start.disabled = true;
+
+            return;
+        }
+
+        if (amount < 3) {
+
+            count.textContent =
+                amount +
+                " Fotos – mindestens 3 benötigt.";
+
+            start.disabled = true;
+
+            return;
+        }
+
+        start.disabled = false;
+
+    }
+);
+
+
+start.addEventListener(
+    "click",
+    async () => {
+
+        if (!photos.files.length) {
+            return;
+        }
+
+        start.disabled = true;
+
+        status.textContent =
+            "Fotos werden hochgeladen...";
+
+        bar.style.width = "10%";
+
+        const form =
+            new FormData();
+
+        for (
+            const file of photos.files
+        ) {
+
+            form.append(
+                "photos",
+                file
+            );
+        }
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/scan",
+                    {
+                        method: "POST",
+                        body: form
+                    }
+                );
+
+            const result =
+                await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    result.error ||
+                    "Upload fehlgeschlagen."
+                );
+            }
+
+            bar.style.width = "100%";
+
+            status.innerHTML =
+                `
+                <strong>Upload abgeschlossen.</strong><br>
+                ${result.photos} Fotos wurden übertragen.<br><br>
+                Scan-ID:<br>
+                ${result.scanId}
+                `;
+
+        } catch (error) {
+
+            status.textContent =
+                "Fehler: " +
+                error.message;
+
+            bar.style.width = "0%";
+
+            start.disabled = false;
+        }
+
+    }
+);
+
+</script>
+
+</body>
+
+</html>
