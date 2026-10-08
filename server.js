@@ -11,71 +11,69 @@ const PORT = process.env.PORT || 10000;
 const ROOT = __dirname;
 const SCANS_DIR = path.join(ROOT, "scans");
 
+const ALICEVISION_ROOT =
+    process.env.ALICEVISION_ROOT ||
+    "/opt/AliceVision/AV_bundle";
+
+const ALICEVISION_BIN =
+    path.join(ALICEVISION_ROOT, "bin");
+
 fs.mkdirSync(SCANS_DIR, { recursive: true });
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.static(ROOT));
 
-const PROGRAM_NAMES = {
-    cameraInit: "aliceVision_cameraInit",
-    featureExtraction: "aliceVision_featureExtraction",
-    imageMatching: "aliceVision_imageMatching",
-    featureMatching: "aliceVision_featureMatching",
-    incrementalSfM: "aliceVision_incrementalSfM",
-    depthMap: "aliceVision_depthMap",
-    depthMapFilter: "aliceVision_depthMapFilter",
-    meshing: "aliceVision_meshing",
-    meshFiltering: "aliceVision_meshFiltering",
-    texturing: "aliceVision_texturing"
-};
-
-function findProgram(name) {
-    const locations = [
-        "/usr/local/bin/" + name,
-        "/usr/bin/" + name,
-        "/usr/local/AliceVision/bin/" + name,
-        "/opt/AliceVision/bin/" + name,
-        "/app/AliceVision/bin/" + name
-    ];
-
-    for (const location of locations) {
-        try {
-            if (
-                fs.existsSync(location) &&
-                fs.statSync(location).isFile()
-            ) {
-                return location;
-            }
-        } catch (error) {}
-    }
-
-    return name;
-}
-
 const AV = {
-    cameraInit: findProgram(PROGRAM_NAMES.cameraInit),
-    featureExtraction: findProgram(PROGRAM_NAMES.featureExtraction),
-    imageMatching: findProgram(PROGRAM_NAMES.imageMatching),
-    featureMatching: findProgram(PROGRAM_NAMES.featureMatching),
-    incrementalSfM: findProgram(PROGRAM_NAMES.incrementalSfM),
-    depthMap: findProgram(PROGRAM_NAMES.depthMap),
-    depthMapFilter: findProgram(PROGRAM_NAMES.depthMapFilter),
-    meshing: findProgram(PROGRAM_NAMES.meshing),
-    meshFiltering: findProgram(PROGRAM_NAMES.meshFiltering),
-    texturing: findProgram(PROGRAM_NAMES.texturing)
+    cameraInit: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_cameraInit"
+    ),
+
+    featureExtraction: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_featureExtraction"
+    ),
+
+    imageMatching: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_imageMatching"
+    ),
+
+    featureMatching: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_featureMatching"
+    ),
+
+    incrementalSfM: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_incrementalSfM"
+    ),
+
+    depthMap: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_depthMap"
+    ),
+
+    depthMapFilter: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_depthMapFilter"
+    ),
+
+    meshing: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_meshing"
+    ),
+
+    meshFiltering: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_meshFiltering"
+    ),
+
+    texturing: path.join(
+        ALICEVISION_BIN,
+        "aliceVision_texturing"
+    )
 };
-
-function commandExists(command) {
-    if (!command) {
-        return false;
-    }
-
-    if (command.includes("/")) {
-        return fs.existsSync(command);
-    }
-
-    return true;
-}
 
 function writeJSON(file, data) {
     fs.writeFileSync(
@@ -90,32 +88,28 @@ function readJSON(file, fallback = {}) {
         return JSON.parse(
             fs.readFileSync(file, "utf8")
         );
-    } catch (error) {
+    } catch {
         return fallback;
     }
 }
 
-function scanDir(id) {
+function getScanDir(id) {
     return path.join(
         SCANS_DIR,
         id
     );
 }
 
-function statusFile(id) {
+function getStatusFile(id) {
     return path.join(
-        scanDir(id),
+        getScanDir(id),
         "status.json"
     );
 }
 
 function updateStatus(id, data) {
-    const file = statusFile(id);
-
-    const old = readJSON(
-        file,
-        {}
-    );
+    const file = getStatusFile(id);
+    const old = readJSON(file, {});
 
     writeJSON(
         file,
@@ -127,7 +121,7 @@ function updateStatus(id, data) {
     );
 }
 
-function findAllFiles(directory) {
+function findFiles(directory) {
     const result = [];
 
     if (!fs.existsSync(directory)) {
@@ -166,13 +160,39 @@ function findAllFiles(directory) {
     return result;
 }
 
+function checkPrograms() {
+    const result = {};
+
+    for (
+        const [name, file] of Object.entries(AV)
+    ) {
+        result[name] = {
+            path: file,
+            exists:
+                fs.existsSync(file)
+        };
+    }
+
+    return result;
+}
+
 function run(command, args, cwd) {
     return new Promise((resolve, reject) => {
+        if (!fs.existsSync(command)) {
+            reject(
+                new Error(
+                    "Programm nicht gefunden: " +
+                    command
+                )
+            );
+            return;
+        }
+
         console.log("");
         console.log("========================================");
-        console.log("PROGRAMM");
+        console.log("START");
         console.log(command);
-        console.log("ARGUMENTE");
+        console.log("ARGS");
         console.log(args.join(" "));
         console.log("========================================");
 
@@ -180,8 +200,24 @@ function run(command, args, cwd) {
             command,
             args,
             {
-                cwd: cwd,
-                env: process.env,
+                cwd,
+                env: {
+                    ...process.env,
+                    ALICEVISION_ROOT,
+                    ALICEVISION_INSTALL:
+                        process.env.ALICEVISION_INSTALL ||
+                        ALICEVISION_ROOT,
+                    PATH:
+                        ALICEVISION_BIN +
+                        ":" +
+                        (process.env.PATH || ""),
+                    LD_LIBRARY_PATH:
+                        ALICEVISION_ROOT +
+                        "/lib:" +
+                        ALICEVISION_ROOT +
+                        "/lib64:" +
+                        (process.env.LD_LIBRARY_PATH || "")
+                },
                 stdio: [
                     "ignore",
                     "pipe",
@@ -192,7 +228,7 @@ function run(command, args, cwd) {
 
         child.stdout.on(
             "data",
-            (data) => {
+            data => {
                 process.stdout.write(
                     data.toString()
                 );
@@ -201,7 +237,7 @@ function run(command, args, cwd) {
 
         child.stderr.on(
             "data",
-            (data) => {
+            data => {
                 process.stderr.write(
                     data.toString()
                 );
@@ -210,26 +246,25 @@ function run(command, args, cwd) {
 
         child.on(
             "error",
-            (error) => {
+            error => {
                 reject(error);
             }
         );
 
         child.on(
             "close",
-            (code) => {
+            code => {
                 if (code === 0) {
                     resolve();
-                    return;
+                } else {
+                    reject(
+                        new Error(
+                            command +
+                            " beendet mit Fehlercode " +
+                            code
+                        )
+                    );
                 }
-
-                reject(
-                    new Error(
-                        command +
-                        " beendet mit Fehlercode " +
-                        code
-                    )
-                );
             }
         );
     });
@@ -265,7 +300,7 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-    storage: storage,
+    storage,
 
     limits: {
         files: 100,
@@ -294,15 +329,12 @@ const upload = multer({
             return;
         }
 
-        callback(
-            null,
-            true
-        );
+        callback(null, true);
     }
 });
 
 async function createModel(id) {
-    const root = scanDir(id);
+    const root = getScanDir(id);
 
     const images = path.join(
         root,
@@ -345,15 +377,19 @@ async function createModel(id) {
     );
 
     try {
-        const missing = [];
+        const programs =
+            checkPrograms();
 
-        for (const [key, command] of Object.entries(AV)) {
-            if (!commandExists(command)) {
-                missing.push(
-                    PROGRAM_NAMES[key]
+        const missing =
+            Object.entries(programs)
+                .filter(
+                    ([name, info]) =>
+                        !info.exists
+                )
+                .map(
+                    ([name]) =>
+                        name
                 );
-            }
-        }
 
         if (missing.length > 0) {
             throw new Error(
@@ -364,81 +400,97 @@ async function createModel(id) {
 
         updateStatus(id, {
             state: "processing",
-            step: "Bilder werden vorbereitet",
+            step: "Kameras erkennen",
             progress: 5
         });
 
         fs.mkdirSync(
             camera,
-            { recursive: true }
+            {
+                recursive: true
+            }
         );
 
-        fs.mkdirSync(
-            features,
-            { recursive: true }
-        );
+        const sensorDatabase =
+            path.join(
+                ALICEVISION_ROOT,
+                "share",
+                "aliceVision",
+                "cameraSensors.db"
+            );
 
-        fs.mkdirSync(
-            matches,
-            { recursive: true }
-        );
+        const viewpointsFile =
+            path.join(
+                camera,
+                "viewpoints.sfm"
+            );
 
-        fs.mkdirSync(
-            sfm,
-            { recursive: true }
-        );
-
-        fs.mkdirSync(
-            depth,
-            { recursive: true }
-        );
-
-        fs.mkdirSync(
-            mesh,
-            { recursive: true }
-        );
-
-        fs.mkdirSync(
-            texture,
-            { recursive: true }
-        );
-
-        updateStatus(id, {
-            step: "Kameras erkennen",
-            progress: 10
-        });
+        const cameraInitFile =
+            path.join(
+                camera,
+                "cameraInit.sfm"
+            );
 
         await run(
             AV.cameraInit,
             [
-                "--imageFolder",
-                images,
+                "--sensorDatabase",
+                sensorDatabase,
+
+                "--defaultFieldOfView",
+                "45",
+
+                "--groupCameraFallback",
+                "folder",
+
+                "--verboseLevel",
+                "info",
+
                 "--output",
-                path.join(
-                    camera,
-                    "cameras.sfm"
-                )
+                cameraInitFile,
+
+                "--allowSingleView",
+                "1",
+
+                "--input",
+                viewpointsFile
             ],
             root
         );
 
         updateStatus(id, {
-            step: "Bildmerkmale berechnen",
-            progress: 20
+            step:
+                "Bildmerkmale berechnen",
+            progress: 18
         });
+
+        fs.mkdirSync(
+            features,
+            {
+                recursive: true
+            }
+        );
 
         await run(
             AV.featureExtraction,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameras.sfm"
-                ),
-                "--output",
-                features,
+                cameraInitFile,
+
                 "--describerTypes",
-                "SIFT"
+                "sift",
+
+                "--describerPreset",
+                "normal",
+
+                "--forceCpuExtraction",
+                "True",
+
+                "--verboseLevel",
+                "info",
+
+                "--output",
+                features
             ],
             root
         );
@@ -448,16 +500,25 @@ async function createModel(id) {
             progress: 30
         });
 
+        fs.mkdirSync(
+            matches,
+            {
+                recursive: true
+            }
+        );
+
         await run(
             AV.imageMatching,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameras.sfm"
-                ),
+                cameraInitFile,
+
                 "--featuresFolders",
                 features,
+
+                "--verboseLevel",
+                "info",
+
                 "--output",
                 path.join(
                     matches,
@@ -468,79 +529,124 @@ async function createModel(id) {
         );
 
         updateStatus(id, {
-            step: "Bildpaare abgleichen",
-            progress: 38
+            step:
+                "Bildpaare abgleichen",
+            progress: 40
         });
 
         await run(
             AV.featureMatching,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameras.sfm"
-                ),
+                cameraInitFile,
+
                 "--featuresFolders",
                 features,
+
                 "--imagePairsList",
                 path.join(
                     matches,
                     "imageMatches.txt"
                 ),
-                "--output",
-                matches,
+
                 "--describerTypes",
-                "SIFT"
+                "sift",
+
+                "--photometricMatchingMethod",
+                "ANN_L2",
+
+                "--geometricEstimator",
+                "acransac",
+
+                "--geometricFilterType",
+                "fundamental_matrix",
+
+                "--verboseLevel",
+                "info",
+
+                "--output",
+                matches
             ],
             root
         );
 
         updateStatus(id, {
-            step: "Kamera-Positionen berechnen",
-            progress: 48
+            step:
+                "3D-Kamera-Positionen berechnen",
+            progress: 50
         });
+
+        fs.mkdirSync(
+            sfm,
+            {
+                recursive: true
+            }
+        );
+
+        const sfmFile =
+            path.join(
+                sfm,
+                "sfm.abc"
+            );
+
+        const posesFile =
+            path.join(
+                sfm,
+                "cameras.sfm"
+            );
 
         await run(
             AV.incrementalSfM,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameras.sfm"
-                ),
+                cameraInitFile,
+
                 "--featuresFolders",
                 features,
+
                 "--matchesFolders",
                 matches,
+
+                "--describerTypes",
+                "sift",
+
+                "--verboseLevel",
+                "info",
+
                 "--output",
-                path.join(
-                    sfm,
-                    "sfm.abc"
-                ),
+                sfmFile,
+
                 "--outputViewsAndPoses",
-                path.join(
-                    sfm,
-                    "poses.sfm"
-                )
+                posesFile,
+
+                "--extraInfoFolder",
+                sfm
             ],
             root
         );
 
         updateStatus(id, {
-            step: "Tiefenkarten berechnen",
+            step:
+                "Tiefenkarten berechnen",
             progress: 60
         });
+
+        fs.mkdirSync(
+            depth,
+            {
+                recursive: true
+            }
+        );
 
         await run(
             AV.depthMap,
             [
                 "--input",
-                path.join(
-                    sfm,
-                    "poses.sfm"
-                ),
+                posesFile,
+
                 "--output",
                 depth,
+
                 "--downscale",
                 "2"
             ],
@@ -548,7 +654,8 @@ async function createModel(id) {
         );
 
         updateStatus(id, {
-            step: "Tiefenkarten filtern",
+            step:
+                "Tiefenkarten filtern",
             progress: 68
         });
 
@@ -556,12 +663,11 @@ async function createModel(id) {
             AV.depthMapFilter,
             [
                 "--input",
-                path.join(
-                    sfm,
-                    "poses.sfm"
-                ),
+                posesFile,
+
                 "--depthMapFolder",
                 depth,
+
                 "--output",
                 depth
             ],
@@ -569,91 +675,118 @@ async function createModel(id) {
         );
 
         updateStatus(id, {
-            step: "3D-Mesh erstellen",
+            step:
+                "3D-Mesh erstellen",
             progress: 78
         });
+
+        fs.mkdirSync(
+            mesh,
+            {
+                recursive: true
+            }
+        );
+
+        const meshFile =
+            path.join(
+                mesh,
+                "mesh.obj"
+            );
 
         await run(
             AV.meshing,
             [
                 "--input",
-                path.join(
-                    sfm,
-                    "poses.sfm"
-                ),
+                posesFile,
+
                 "--depthMapFolder",
                 depth,
+
                 "--output",
-                path.join(
-                    mesh,
-                    "mesh.obj"
-                )
+                meshFile
             ],
             root
         );
 
         updateStatus(id, {
-            step: "Mesh verbessern",
+            step:
+                "Mesh verbessern",
             progress: 84
         });
+
+        const filteredMesh =
+            path.join(
+                mesh,
+                "filtered.obj"
+            );
 
         await run(
             AV.meshFiltering,
             [
                 "--input",
-                path.join(
-                    mesh,
-                    "mesh.obj"
-                ),
+                meshFile,
+
                 "--output",
-                path.join(
-                    mesh,
-                    "filtered.obj"
-                )
+                filteredMesh
             ],
             root
         );
 
         updateStatus(id, {
-            step: "Textur erstellen",
+            step:
+                "Fototextur erstellen",
             progress: 92
         });
+
+        fs.mkdirSync(
+            texture,
+            {
+                recursive: true
+            }
+        );
 
         await run(
             AV.texturing,
             [
                 "--input",
-                path.join(
-                    sfm,
-                    "poses.sfm"
-                ),
+                posesFile,
+
                 "--inputMesh",
-                path.join(
-                    mesh,
-                    "filtered.obj"
-                ),
+                filteredMesh,
+
                 "--output",
                 texture,
+
                 "--textureSide",
-                "8192"
+                "16384"
             ],
             root
         );
 
-        const files = findAllFiles(root)
-            .filter(
-                (file) =>
-                    !file.startsWith(
-                        "images/"
-                    )
-            );
+        const files =
+            findFiles(root)
+                .filter(
+                    file =>
+                        !file.startsWith(
+                            "images/"
+                        )
+                );
 
         updateStatus(id, {
             state: "finished",
             step: "Fertig",
             progress: 100,
-            files: files
+            files,
+            mesh:
+                "mesh/filtered.obj",
+            texture:
+                "texture"
         });
+
+        console.log(
+            "SCAN FERTIG:",
+            id
+        );
     } catch (error) {
         console.error(
             "SCAN FEHLER:",
@@ -671,6 +804,50 @@ async function createModel(id) {
     }
 }
 
+function createViewpointsFile(
+    scanId,
+    files
+) {
+    const root =
+        getScanDir(scanId);
+
+    const images =
+        files.map(
+            file => ({
+                "viewId": -1,
+                "imagePath": file
+            })
+        );
+
+    const data = {
+        version: [
+            1,
+            0,
+            0
+        ],
+        views: images
+    };
+
+    const file =
+        path.join(
+            root,
+            "camera",
+            "viewpoints.sfm"
+        );
+
+    fs.mkdirSync(
+        path.dirname(file),
+        {
+            recursive: true
+        }
+    );
+
+    writeJSON(
+        file,
+        data
+    );
+}
+
 app.post(
     "/api/upload",
     (req, res, next) => {
@@ -680,7 +857,7 @@ app.post(
                 .toString("hex");
 
         const root =
-            scanDir(id);
+            getScanDir(id);
 
         const images =
             path.join(
@@ -695,7 +872,8 @@ app.post(
             }
         );
 
-        req.scanImagesDir = images;
+        req.scanImagesDir =
+            images;
 
         upload.array(
             "photos",
@@ -703,7 +881,7 @@ app.post(
         )(
             req,
             res,
-            (error) => {
+            error => {
                 if (error) {
                     next(error);
                     return;
@@ -722,6 +900,18 @@ app.post(
                     return;
                 }
 
+                const imageFiles =
+                    req.files.map(
+                        file =>
+                            "file://" +
+                            file.path
+                    );
+
+                createViewpointsFile(
+                    id,
+                    imageFiles
+                );
+
                 writeJSON(
                     path.join(
                         root,
@@ -729,7 +919,8 @@ app.post(
                     ),
                     {
                         photos: count,
-                        textureTarget: 30000,
+                        textureTarget:
+                            30000,
                         maximumTriangles:
                             750000000,
                         created:
@@ -744,7 +935,8 @@ app.post(
                         "status.json"
                     ),
                     {
-                        state: "queued",
+                        state:
+                            "queued",
                         step:
                             "Warte auf Verarbeitung",
                         progress: 0,
@@ -768,7 +960,7 @@ app.get(
     "/api/status/:id",
     (req, res) => {
         const file =
-            statusFile(
+            getStatusFile(
                 req.params.id
             );
 
@@ -790,10 +982,52 @@ app.get(
 );
 
 app.get(
+    "/api/scan/:id",
+    (req, res) => {
+        const root =
+            getScanDir(
+                req.params.id
+            );
+
+        if (!fs.existsSync(root)) {
+            res.status(404).json({
+                error:
+                    "Scan nicht gefunden."
+            });
+            return;
+        }
+
+        res.json({
+            scanId:
+                req.params.id,
+            settings:
+                readJSON(
+                    path.join(
+                        root,
+                        "settings.json"
+                    ),
+                    {}
+                ),
+            status:
+                readJSON(
+                    path.join(
+                        root,
+                        "status.json"
+                    ),
+                    {}
+                )
+        });
+    }
+);
+
+app.get(
     "/api/download/:id/{*file}",
     (req, res) => {
-        const id =
-            req.params.id;
+        const root =
+            path.resolve(
+                SCANS_DIR,
+                req.params.id
+            );
 
         const requested =
             req.params.file;
@@ -804,12 +1038,6 @@ app.get(
             );
             return;
         }
-
-        const root =
-            path.resolve(
-                SCANS_DIR,
-                id
-            );
 
         const filePath =
             path.resolve(
@@ -847,32 +1075,14 @@ app.get(
 app.get(
     "/api/health",
     (req, res) => {
-        const programs = {};
-
-        for (
-            const [key, originalName]
-            of Object.entries(PROGRAM_NAMES)
-        ) {
-            const program =
-                AV[key];
-
-            programs[key] = {
-                name: originalName,
-                path: program,
-                exists:
-                    program !== null &&
-                    (
-                        !program.includes("/") ||
-                        fs.existsSync(program)
-                    )
-            };
-        }
-
         res.json({
             ok: true,
-            node: process.version,
-            port: PORT,
-            alicevision: programs
+            node:
+                process.version,
+            aliceVisionRoot:
+                ALICEVISION_ROOT,
+            programs:
+                checkPrograms()
         });
     }
 );
@@ -881,8 +1091,10 @@ app.get(
     "/api",
     (req, res) => {
         res.json({
-            name: "AliceVision 3D Scanner",
-            status: "online"
+            name:
+                "AliceVision 3D Scanner",
+            status:
+                "online"
         });
     }
 );
@@ -909,29 +1121,31 @@ app.listen(
         console.log(
             "========================================"
         );
+
         console.log(
             "ALICEVISION 3D SCANNER"
         );
+
         console.log(
             "PORT:",
             PORT
         );
+
         console.log(
-            "NODE:",
-            process.version
+            "ALICEVISION_ROOT:",
+            ALICEVISION_ROOT
         );
+
         console.log(
             "========================================"
         );
 
-        for (
-            const [key, value]
-            of Object.entries(AV)
-        ) {
-            console.log(
-                key + ":",
-                value
-            );
-        }
+        console.log(
+            JSON.stringify(
+                checkPrograms(),
+                null,
+                2
+            )
+        );
     }
 );
