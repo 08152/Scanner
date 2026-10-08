@@ -1,4 +1,3 @@
-```json
 {
   "name": "alicevision-3d-scanner",
   "version": "1.0.0",
@@ -12,4 +11,3 @@
     "multer": "^2.0.2"
   }
 }
-```
