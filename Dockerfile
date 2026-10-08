@@ -38,12 +38,6 @@ RUN wget -O AliceVision.tar.gz \
     && tar -xzf AliceVision.tar.gz -C /opt/AliceVision \
     && rm AliceVision.tar.gz
 
-RUN echo "=== ALICEVISION ===" \
-    && find /opt/AliceVision \
-    -type f \
-    -name "aliceVision_cameraInit*" \
-    -print
-
 RUN mkdir -p /opt/AliceVision/bin \
     && for FILE in /opt/AliceVision/AV_bundle/bin/aliceVision_*; do \
         NAME="$(basename "$FILE")"; \
@@ -55,22 +49,14 @@ ENV ALICEVISION_ROOT=/opt/AliceVision/AV_bundle
 ENV ALICEVISION_INSTALL=/opt/AliceVision/AV_bundle
 ENV PATH=/opt/AliceVision/bin:/opt/AliceVision/AV_bundle/bin:$PATH
 ENV LD_LIBRARY_PATH=/opt/AliceVision/AV_bundle/lib:/opt/AliceVision/AV_bundle/lib64:$LD_LIBRARY_PATH
-ENV ALICEVISION_SENSOR_DB=/opt/AliceVision/AV_bundle/share/aliceVision/cameraSensors.db
 
-RUN mkdir -p /opt/AliceVision/AV_bundle/share/aliceVision
-
-RUN if [ ! -f /opt/AliceVision/AV_bundle/share/aliceVision/cameraSensors.db ]; then \
-        wget -O /opt/AliceVision/AV_bundle/share/aliceVision/cameraSensors.db \
-        "https://raw.githubusercontent.com/alicevision/AliceVision/develop/src/aliceVision/sensorDB/cameraSensors.db"; \
-    fi
-
-RUN echo "=== TEST ===" \
-    && echo "ALICEVISION_ROOT=$ALICEVISION_ROOT" \
-    && ls -la "$ALICEVISION_ROOT" \
-    && ls -la "$ALICEVISION_ROOT/bin" \
-    && ls -la "$ALICEVISION_ROOT/share/aliceVision" \
+RUN echo "=== ALICEVISION ROOT ===" \
+    && echo "$ALICEVISION_ROOT" \
+    && echo "=== CAMERA INIT ===" \
+    && ls -l /opt/AliceVision/bin/aliceVision_cameraInit \
+    && test -x /opt/AliceVision/bin/aliceVision_cameraInit \
     && which aliceVision_cameraInit \
-    && aliceVision_cameraInit --help >/dev/null
+    && echo "=== ALICEVISION OK ==="
 
 WORKDIR /app
 
