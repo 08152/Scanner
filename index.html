@@ -1,25 +1,13 @@
+```html
 <!DOCTYPE html>
-
 <html lang="de">
-
 <head>
-
 <meta charset="UTF-8">
-
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
->
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>3D Scanner</title>
 
-
 <style>
-
-/* =========================
-   GRUNDLAYOUT
-========================= */
-
 * {
     box-sizing: border-box;
 }
@@ -32,1032 +20,535 @@ body {
 }
 
 body {
-
     background: #101114;
-
     color: #ffffff;
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-    padding:
-        20px;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 20px;
 }
-
 
 .app {
-
     width: 100%;
-
-    max-width:
-        900px;
-
-    margin:
-        0 auto;
+    max-width: 900px;
+    margin: 0 auto;
 }
 
-
-/* =========================
-   HEADER
-========================= */
-
 .header {
-
-    text-align:
-        center;
-
-    margin-bottom:
-        24px;
+    text-align: center;
+    margin-bottom: 24px;
 }
 
 .header h1 {
-
-    margin:
-        0 0 8px;
-
-    font-size:
-        clamp(
-            32px,
-            7vw,
-            52px
-        );
+    margin: 0 0 8px;
+    font-size: clamp(32px, 7vw, 52px);
 }
 
 .header p {
-
-    margin:
-        0;
-
-    color:
-        #a8a8a8;
-
-    font-size:
-        16px;
-
-    line-height:
-        1.5;
+    margin: 0;
+    color: #a8a8a8;
+    font-size: 16px;
+    line-height: 1.5;
 }
-
-
-/* =========================
-   KARTEN
-========================= */
 
 .card {
-
     width: 100%;
-
-    background:
-        #1a1c21;
-
-    border:
-        1px solid #292c33;
-
-    border-radius:
-        18px;
-
-    padding:
-        20px;
-
-    margin-bottom:
-        18px;
+    background: #1a1c21;
+    border: 1px solid #292c33;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 18px;
 }
 
-
-/* =========================
-   INFOS
-========================= */
-
 .info-grid {
-
-    display:
-        grid;
-
-    grid-template-columns:
-        repeat(
-            3,
-            1fr
-        );
-
-    gap:
-        12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
 }
 
 .info {
-
-    min-width:
-        0;
-
-    background:
-        #23262d;
-
-    border-radius:
-        14px;
-
-    padding:
-        16px;
-
-    text-align:
-        center;
+    min-width: 0;
+    background: #23262d;
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
 }
 
 .info-value {
-
-    display:
-        block;
-
-    font-size:
-        24px;
-
-    font-weight:
-        bold;
-
-    margin-bottom:
-        5px;
+    display: block;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
 }
 
 .info-label {
-
-    color:
-        #999;
-
-    font-size:
-        13px;
+    color: #999;
+    font-size: 13px;
 }
 
-
-/* =========================
-   UPLOAD
-========================= */
-
 .upload-area {
-
-    width:
-        100%;
-
-    min-height:
-        230px;
-
-    border:
-        2px dashed #555;
-
-    border-radius:
-        16px;
-
-    display:
-        flex;
-
-    flex-direction:
-        column;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    text-align:
-        center;
-
-    padding:
-        25px;
-
-    cursor:
-        pointer;
-
-    user-select:
-        none;
-
-    transition:
-        background .2s,
-        border-color .2s;
+    width: 100%;
+    min-height: 230px;
+    border: 2px dashed #555;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 25px;
+    cursor: pointer;
+    user-select: none;
+    transition: background .2s, border-color .2s;
 }
 
 .upload-area:hover {
-
-    background:
-        #202329;
-
-    border-color:
-        #aaa;
+    background: #202329;
+    border-color: #aaa;
 }
 
 .upload-area.drag {
-
-    background:
-        #252830;
-
-    border-color:
-        #ffffff;
+    background: #252830;
+    border-color: #ffffff;
 }
 
 .upload-icon {
-
-    font-size:
-        54px;
-
-    margin-bottom:
-        12px;
+    font-size: 54px;
+    margin-bottom: 12px;
 }
 
 .upload-title {
-
-    font-size:
-        21px;
-
-    font-weight:
-        bold;
-
-    margin-bottom:
-        8px;
+    font-size: 21px;
+    font-weight: bold;
+    margin-bottom: 8px;
 }
 
 .upload-description {
-
-    color:
-        #999;
-
-    line-height:
-        1.5;
+    color: #999;
+    line-height: 1.5;
 }
 
 #photos {
-
-    display:
-        none;
+    display: none;
 }
-
-
-/* =========================
-   DATEIEN
-========================= */
 
 .file-count {
-
-    margin-top:
-        15px;
-
-    padding:
-        13px;
-
-    background:
-        #23262d;
-
-    border-radius:
-        12px;
-
-    color:
-        #ccc;
-
-    text-align:
-        center;
+    margin-top: 15px;
+    padding: 13px;
+    background: #23262d;
+    border-radius: 12px;
+    color: #ccc;
+    text-align: center;
 }
 
-
-/* =========================
-   BUTTON
-========================= */
-
 .main-button {
-
-    width:
-        100%;
-
-    min-height:
-        60px;
-
-    margin-top:
-        15px;
-
-    border:
-        0;
-
-    border-radius:
-        15px;
-
-    background:
-        #ffffff;
-
-    color:
-        #111111;
-
-    font-size:
-        18px;
-
-    font-weight:
-        bold;
-
-    cursor:
-        pointer;
-
-    touch-action:
-        manipulation;
+    width: 100%;
+    min-height: 60px;
+    margin-top: 15px;
+    border: 0;
+    border-radius: 15px;
+    background: #ffffff;
+    color: #111111;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    touch-action: manipulation;
 }
 
 .main-button:disabled {
-
-    opacity:
-        .35;
-
-    cursor:
-        not-allowed;
+    opacity: .35;
+    cursor: not-allowed;
 }
 
-
-/* =========================
-   STATUS
-========================= */
-
 .status-title {
-
-    font-size:
-        21px;
-
-    font-weight:
-        bold;
-
-    margin-bottom:
-        10px;
+    font-size: 21px;
+    font-weight: bold;
+    margin-bottom: 10px;
 }
 
 .status-message {
-
-    color:
-        #c5c5c5;
-
-    line-height:
-        1.5;
-
-    min-height:
-        24px;
+    color: #c5c5c5;
+    line-height: 1.5;
+    min-height: 24px;
 }
 
 .progress {
-
-    width:
-        100%;
-
-    height:
-        14px;
-
-    margin-top:
-        18px;
-
-    background:
-        #30333a;
-
-    border-radius:
-        20px;
-
-    overflow:
-        hidden;
+    width: 100%;
+    height: 14px;
+    margin-top: 18px;
+    background: #30333a;
+    border-radius: 20px;
+    overflow: hidden;
 }
 
 .progress-bar {
-
-    width:
-        0%;
-
-    height:
-        100%;
-
-    background:
-        #ffffff;
-
-    transition:
-        width .5s;
+    width: 0%;
+    height: 100%;
+    background: #ffffff;
+    transition: width .5s;
 }
 
-
-/* =========================
-   VORSCHAU
-========================= */
-
 .viewer-card {
-
-    display:
-        none;
+    display: none;
 }
 
 .viewer-title {
-
-    margin:
-        0 0 15px;
-
-    font-size:
-        24px;
+    margin: 0 0 15px;
+    font-size: 24px;
 }
 
 .viewer {
-
-    width:
-        100%;
-
-    height:
-        520px;
-
-    background:
-        #08090b;
-
-    border-radius:
-        16px;
-
-    overflow:
-        hidden;
+    width: 100%;
+    height: 520px;
+    background: #08090b;
+    border-radius: 16px;
+    overflow: hidden;
 }
 
 model-viewer {
-
-    width:
-        100%;
-
-    height:
-        100%;
-
-    background:
-        #08090b;
+    width: 100%;
+    height: 100%;
+    background: #08090b;
 }
 
 .viewer-help {
-
-    text-align:
-        center;
-
-    color:
-        #888;
-
-    margin-top:
-        12px;
-
-    line-height:
-        1.5;
+    text-align: center;
+    color: #888;
+    margin-top: 12px;
+    line-height: 1.5;
 }
 
-
-/* =========================
-   DOWNLOADS
-========================= */
-
 .download-card {
-
-    display:
-        none;
+    display: none;
 }
 
 .download-list {
-
-    display:
-        flex;
-
-    flex-direction:
-        column;
-
-    gap:
-        12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .download-button {
-
-    width:
-        100%;
-
-    min-height:
-        58px;
-
-    display:
-        flex;
-
-    align-items:
-        center;
-
-    justify-content:
-        center;
-
-    background:
-        #ffffff;
-
-    color:
-        #111111;
-
-    border-radius:
-        14px;
-
-    text-decoration:
-        none;
-
-    font-weight:
-        bold;
-
-    padding:
-        15px;
-
-    text-align:
-        center;
-
-    overflow-wrap:
-        anywhere;
+    width: 100%;
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    color: #111111;
+    border-radius: 14px;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 15px;
+    text-align: center;
+    overflow-wrap: anywhere;
 }
 
-
-/* =========================
-   FEHLER / ERFOLG
-========================= */
-
 .error {
-
-    color:
-        #ff7777;
+    color: #ff7777;
 }
 
 .success {
-
-    color:
-        #80e890;
+    color: #80e890;
 }
 
-
-/* =========================
-   CHROMEBOOK / TABLET
-========================= */
-
-@media (
-    max-width: 650px
-) {
-
+@media (max-width: 650px) {
     body {
-        padding:
-            10px;
+        padding: 10px;
     }
 
     .card {
-        padding:
-            15px;
+        padding: 15px;
     }
 
     .info-grid {
-
-        grid-template-columns:
-            1fr;
+        grid-template-columns: 1fr;
     }
 
     .viewer {
-
-        height:
-            420px;
+        height: 420px;
     }
 }
 
-
-/* =========================
-   KLEINES HANDY
-========================= */
-
-@media (
-    max-width: 420px
-) {
-
+@media (max-width: 420px) {
     .viewer {
-
-        height:
-            330px;
+        height: 330px;
     }
 
     .upload-area {
-
-        min-height:
-            200px;
+        min-height: 200px;
     }
 }
-
 </style>
-
 </head>
-
 
 <body>
 
-
 <div class="app">
 
+<header class="header">
+    <h1>3D Scanner</h1>
+    <p>
+        Fotos hochladen und daraus
+        ein 3D-Modell erstellen.
+    </p>
+</header>
 
-    <!-- HEADER -->
+<section class="card">
 
-    <header class="header">
+    <div class="info-grid">
 
-        <h1>
-            3D Scanner
-        </h1>
-
-        <p>
-            Fotos hochladen und daraus
-            ein 3D-Modell erstellen.
-        </p>
-
-    </header>
-
-
-
-    <!-- TECHNISCHE ZIELE -->
-
-    <section class="card">
-
-        <div class="info-grid">
-
-            <div class="info">
-
-                <span class="info-value">
-                    100
-                </span>
-
-                <span class="info-label">
-                    Fotos maximal
-                </span>
-
-            </div>
-
-
-            <div class="info">
-
-                <span class="info-value">
-                    30K
-                </span>
-
-                <span class="info-label">
-                    Textur-Ziel
-                </span>
-
-            </div>
-
-
-            <div class="info">
-
-                <span class="info-value">
-                    750M
-                </span>
-
-                <span class="info-label">
-                    Dreiecks-Ziel
-                </span>
-
-            </div>
-
+        <div class="info">
+            <span class="info-value">100</span>
+            <span class="info-label">Fotos maximal</span>
         </div>
 
-    </section>
-
-
-
-    <!-- UPLOAD -->
-
-    <section class="card">
-
-        <label
-            class="upload-area"
-            id="uploadArea"
-            for="photos"
-        >
-
-            <div class="upload-icon">
-                📷
-            </div>
-
-            <div class="upload-title">
-                Fotos auswählen
-            </div>
-
-            <div class="upload-description">
-
-                50–100 Fotos empfohlen.
-
-                <br>
-
-                JPG, PNG oder WebP.
-
-                <br>
-
-                Du kannst Dateien auch
-                hierher ziehen.
-
-            </div>
-
-        </label>
-
-
-        <input
-            id="photos"
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            multiple
-        >
-
-
-        <div
-            class="file-count"
-            id="fileCount"
-        >
-            Noch keine Fotos ausgewählt.
+        <div class="info">
+            <span class="info-value">30K</span>
+            <span class="info-label">Textur-Ziel</span>
         </div>
 
-
-        <button
-            class="main-button"
-            id="createButton"
-            disabled
-        >
-            3D-MODELL ERSTELLEN
-        </button>
-
-    </section>
-
-
-
-    <!-- STATUS -->
-
-    <section class="card">
-
-        <div class="status-title">
-            Status
+        <div class="info">
+            <span class="info-value">750M</span>
+            <span class="info-label">Dreiecks-Ziel</span>
         </div>
 
-        <div
-            class="status-message"
-            id="statusMessage"
-        >
-            Bereit.
-        </div>
+    </div>
 
-        <div class="progress">
+</section>
 
-            <div
-                class="progress-bar"
-                id="progressBar"
-            ></div>
+<section class="card">
 
-        </div>
-
-    </section>
-
-
-
-    <!-- 3D-VORSCHAU -->
-
-    <section
-        class="card viewer-card"
-        id="viewerCard"
+    <label
+        class="upload-area"
+        id="uploadArea"
+        for="photos"
     >
 
-        <h2 class="viewer-title">
-            3D-Vorschau
-        </h2>
+        <div class="upload-icon">📷</div>
 
-
-        <div class="viewer">
-
-            <model-viewer
-                id="modelViewer"
-
-                camera-controls
-
-                touch-action="pan-y"
-
-                auto-rotate
-
-                shadow-intensity="1"
-
-                exposure="1"
-
-                loading="eager"
-            >
-            </model-viewer>
-
+        <div class="upload-title">
+            Fotos auswählen
         </div>
 
-
-        <div class="viewer-help">
-
-            Finger bewegen:
-            Modell drehen
-
+        <div class="upload-description">
+            50–100 Fotos empfohlen.
             <br>
-
-            Zwei Finger:
-            zoomen
-
+            JPG, PNG oder WebP.
+            <br>
+            Du kannst Dateien auch hierher ziehen.
         </div>
 
-    </section>
+    </label>
 
-
-
-    <!-- DOWNLOAD -->
-
-    <section
-        class="card download-card"
-        id="downloadCard"
+    <input
+        id="photos"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
     >
 
-        <h2>
-            Modell herunterladen
-        </h2>
+    <div class="file-count" id="fileCount">
+        Noch keine Fotos ausgewählt.
+    </div>
 
+    <button
+        class="main-button"
+        id="createButton"
+        disabled
+    >
+        3D-MODELL ERSTELLEN
+    </button>
 
+</section>
+
+<section class="card">
+
+    <div class="status-title">
+        Status
+    </div>
+
+    <div
+        class="status-message"
+        id="statusMessage"
+    >
+        Bereit.
+    </div>
+
+    <div class="progress">
         <div
-            class="download-list"
-            id="downloadList"
-        >
-        </div>
+            class="progress-bar"
+            id="progressBar"
+        ></div>
+    </div>
 
-    </section>
+</section>
 
+<section
+    class="card viewer-card"
+    id="viewerCard"
+>
+
+    <h2 class="viewer-title">
+        3D-Vorschau
+    </h2>
+
+    <div class="viewer">
+
+        <model-viewer
+            id="modelViewer"
+            camera-controls
+            touch-action="pan-y"
+            auto-rotate
+            shadow-intensity="1"
+            exposure="1"
+            loading="eager"
+        ></model-viewer>
+
+    </div>
+
+    <div class="viewer-help">
+        Finger bewegen: Modell drehen
+        <br>
+        Zwei Finger: zoomen
+    </div>
+
+</section>
+
+<section
+    class="card download-card"
+    id="downloadCard"
+>
+
+    <h2>
+        Modell herunterladen
+    </h2>
+
+    <div
+        class="download-list"
+        id="downloadList"
+    ></div>
+
+</section>
 
 </div>
-
-
-
-<!-- 3D VIEWER -->
 
 <script
     type="module"
     src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
 ></script>
 
-
-
 <script>
-
-/* =========================
-   ELEMENTE
-========================= */
-
 const photos =
-    document.getElementById(
-        "photos"
-    );
+    document.getElementById("photos");
 
 const uploadArea =
-    document.getElementById(
-        "uploadArea"
-    );
+    document.getElementById("uploadArea");
 
 const fileCount =
-    document.getElementById(
-        "fileCount"
-    );
+    document.getElementById("fileCount");
 
 const createButton =
-    document.getElementById(
-        "createButton"
-    );
+    document.getElementById("createButton");
 
 const statusMessage =
-    document.getElementById(
-        "statusMessage"
-    );
+    document.getElementById("statusMessage");
 
 const progressBar =
-    document.getElementById(
-        "progressBar"
-    );
+    document.getElementById("progressBar");
 
 const viewerCard =
-    document.getElementById(
-        "viewerCard"
-    );
+    document.getElementById("viewerCard");
 
 const modelViewer =
-    document.getElementById(
-        "modelViewer"
-    );
+    document.getElementById("modelViewer");
 
 const downloadCard =
-    document.getElementById(
-        "downloadCard"
-    );
+    document.getElementById("downloadCard");
 
 const downloadList =
-    document.getElementById(
-        "downloadList"
-    );
-
+    document.getElementById("downloadList");
 
 let selectedFiles = [];
-
 let currentScanId = null;
 
 
 /* =========================
-   DATEIEN AUSWÄHLEN
+   DATEIEN
 ========================= */
 
-photos.addEventListener(
-    "change",
-    () => {
+photos.addEventListener("change", () => {
 
-        selectedFiles =
-            Array.from(
-                photos.files
-            ).slice(
-                0,
-                100
-            );
+    selectedFiles =
+        Array.from(photos.files)
+        .filter(isImage)
+        .slice(0, 100);
 
-        updateFileCount();
-    }
-);
+    updateFileCount();
+});
+
+
+function isImage(file) {
+
+    return [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ].includes(file.type);
+}
 
 
 /* =========================
    DRAG & DROP
 ========================= */
 
-uploadArea.addEventListener(
-    "dragover",
-    event => {
+uploadArea.addEventListener("dragover", event => {
 
-        event.preventDefault();
+    event.preventDefault();
 
-        uploadArea.classList.add(
-            "drag"
-        );
-    }
-);
+    uploadArea.classList.add("drag");
+});
 
 
-uploadArea.addEventListener(
-    "dragleave",
-    () => {
+uploadArea.addEventListener("dragleave", () => {
 
-        uploadArea.classList.remove(
-            "drag"
-        );
-    }
-);
+    uploadArea.classList.remove("drag");
+});
 
 
-uploadArea.addEventListener(
-    "drop",
-    event => {
+uploadArea.addEventListener("drop", event => {
 
-        event.preventDefault();
+    event.preventDefault();
 
-        uploadArea.classList.remove(
-            "drag"
-        );
+    uploadArea.classList.remove("drag");
 
+    selectedFiles =
+        Array.from(event.dataTransfer.files)
+        .filter(isImage)
+        .slice(0, 100);
 
-        selectedFiles =
-            Array.from(
-                event.dataTransfer.files
-            )
-            .filter(
-                file =>
-                    file.type ===
-                        "image/jpeg" ||
-
-                    file.type ===
-                        "image/png" ||
-
-                    file.type ===
-                        "image/webp"
-            )
-            .slice(
-                0,
-                100
-            );
-
-
-        updateFileCount();
-    }
-);
+    updateFileCount();
+});
 
 
 /* =========================
-   DATEIANZAHL
+   ANZAHL
 ========================= */
 
 function updateFileCount() {
 
-    const count =
-        selectedFiles.length;
-
+    const count = selectedFiles.length;
 
     if (count === 0) {
 
         fileCount.textContent =
             "Noch keine Fotos ausgewählt.";
 
-        createButton.disabled =
-            true;
+        createButton.disabled = true;
 
         return;
     }
 
-
     fileCount.textContent =
         `${count} Foto${count === 1 ? "" : "s"} ausgewählt.`;
-
 
     createButton.disabled =
         count < 3;
@@ -1065,7 +556,7 @@ function updateFileCount() {
 
 
 /* =========================
-   MODELL ERSTELLEN
+   SCAN STARTEN
 ========================= */
 
 createButton.addEventListener(
@@ -1076,9 +567,7 @@ createButton.addEventListener(
 
 async function startScan() {
 
-    if (
-        selectedFiles.length < 3
-    ) {
+    if (selectedFiles.length < 3) {
 
         setError(
             "Bitte mindestens 3 Fotos auswählen."
@@ -1087,40 +576,18 @@ async function startScan() {
         return;
     }
 
+    createButton.disabled = true;
 
-    createButton.disabled =
-        true;
+    viewerCard.style.display = "none";
+    downloadCard.style.display = "none";
+    downloadList.innerHTML = "";
 
+    setProgress(5);
+    setStatus("Fotos werden hochgeladen...");
 
-    viewerCard.style.display =
-        "none";
+    const formData = new FormData();
 
-
-    downloadCard.style.display =
-        "none";
-
-
-    downloadList.innerHTML =
-        "";
-
-
-    setProgress(
-        5
-    );
-
-
-    setStatus(
-        "Fotos werden hochgeladen..."
-    );
-
-
-    const formData =
-        new FormData();
-
-
-    for (
-        const file of selectedFiles
-    ) {
+    for (const file of selectedFiles) {
 
         formData.append(
             "photos",
@@ -1128,29 +595,37 @@ async function startScan() {
         );
     }
 
-
     try {
+
+        /*
+         * WICHTIG:
+         * Der Server besitzt /api/upload,
+         * nicht /api/scan.
+         */
 
         const response =
             await fetch(
-                "/api/scan",
+                "/api/upload",
                 {
-                    method:
-                        "POST",
-
-                    body:
-                        formData
+                    method: "POST",
+                    body: formData
                 }
             );
 
+        const text =
+            await response.text();
 
-        const data =
-            await response.json();
+        let data;
 
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(
+                `Server antwortete mit ${response.status}: ${text}`
+            );
+        }
 
-        if (
-            !response.ok
-        ) {
+        if (!response.ok) {
 
             throw new Error(
                 data.error ||
@@ -1158,38 +633,39 @@ async function startScan() {
             );
         }
 
+        if (!data.scanId) {
+
+            throw new Error(
+                "Server hat keine Scan-ID zurückgegeben."
+            );
+        }
 
         currentScanId =
             data.scanId;
 
-
-        setProgress(
-            10
-        );
-
+        setProgress(10);
 
         setStatus(
-            "Upload fertig. 3D-Berechnung gestartet..."
+            `Upload fertig. ${data.photos || selectedFiles.length} Fotos werden verarbeitet...`
         );
-
 
         pollStatus();
 
-
     } catch (error) {
+
+        console.error(error);
 
         setError(
             error.message
         );
 
-        createButton.disabled =
-            false;
+        createButton.disabled = false;
     }
 }
 
 
 /* =========================
-   STATUS
+   STATUS ABFRAGEN
 ========================= */
 
 async function pollStatus() {
@@ -1198,22 +674,27 @@ async function pollStatus() {
         return;
     }
 
-
     try {
 
         const response =
             await fetch(
-                `/api/status/${currentScanId}`
+                `/api/status/${encodeURIComponent(currentScanId)}`
             );
 
+        const text =
+            await response.text();
 
-        const data =
-            await response.json();
+        let data;
 
+        try {
+            data = JSON.parse(text);
+        } catch {
+            throw new Error(
+                `Status-Server antwortete mit ${response.status}.`
+            );
+        }
 
-        if (
-            !response.ok
-        ) {
+        if (!response.ok) {
 
             throw new Error(
                 data.error ||
@@ -1221,42 +702,40 @@ async function pollStatus() {
             );
         }
 
+        /*
+         * Der Server verwendet:
+         *
+         * state
+         * step
+         * progress
+         */
 
         setStatus(
-            data.message ||
+            data.step ||
             "Berechnung läuft..."
         );
 
-
-        updateProgress(
-            data.message
+        setProgress(
+            Number(data.progress) || 0
         );
 
 
-        if (
-            data.status ===
-            "finished"
-        ) {
+        if (data.state === "finished") {
 
-            showFinished(
-                data
-            );
+            showFinished(data);
 
             return;
         }
 
 
-        if (
-            data.status ===
-            "error"
-        ) {
+        if (data.state === "error") {
 
             setError(
-                data.message
+                data.error ||
+                "Bei der 3D-Berechnung ist ein Fehler aufgetreten."
             );
 
-            createButton.disabled =
-                false;
+            createButton.disabled = false;
 
             return;
         }
@@ -1267,13 +746,13 @@ async function pollStatus() {
             3000
         );
 
-
     } catch (error) {
+
+        console.error(error);
 
         setError(
             error.message
         );
-
 
         setTimeout(
             pollStatus,
@@ -1284,194 +763,90 @@ async function pollStatus() {
 
 
 /* =========================
-   FORTSCHRITT
-========================= */
-
-function updateProgress(
-    message
-) {
-
-    const text =
-        String(
-            message || ""
-        ).toLowerCase();
-
-
-    let value = 15;
-
-
-    if (
-        text.includes(
-            "analysiert"
-        )
-    ) {
-        value = 20;
-    }
-
-
-    if (
-        text.includes(
-            "verglichen"
-        )
-    ) {
-        value = 30;
-    }
-
-
-    if (
-        text.includes(
-            "kamera"
-        )
-    ) {
-        value = 40;
-    }
-
-
-    if (
-        text.includes(
-            "geometrie"
-        )
-    ) {
-        value = 55;
-    }
-
-
-    if (
-        text.includes(
-            "punktwolke"
-        )
-    ) {
-        value = 68;
-    }
-
-
-    if (
-        text.includes(
-            "oberfläche"
-        )
-    ) {
-        value = 78;
-    }
-
-
-    if (
-        text.includes(
-            "textur"
-        )
-    ) {
-        value = 88;
-    }
-
-
-    if (
-        text.includes(
-            "browser"
-        )
-    ) {
-        value = 95;
-    }
-
-
-    setProgress(
-        value
-    );
-}
-
-
-/* =========================
    FERTIG
 ========================= */
 
-function showFinished(
-    data
-) {
+function showFinished(data) {
 
-    setProgress(
-        100
-    );
-
+    setProgress(100);
 
     setSuccess(
         "✅ 3D-Modell ist fertig."
     );
 
-
     const files =
-        Array.isArray(
-            data.files
-        )
+        Array.isArray(data.files)
             ? data.files
             : [];
 
 
     const glb =
+        data.model ||
         files.find(
             file =>
                 file
                     .toLowerCase()
-                    .endsWith(
-                        ".glb"
-                    )
+                    .endsWith(".glb")
         );
 
 
     if (glb) {
 
+        const cleanPath =
+            glb
+                .split("/")
+                .map(part =>
+                    encodeURIComponent(part)
+                )
+                .join("/");
+
         const url =
             `/api/download/` +
-            `${currentScanId}/` +
-            encodeURIComponent(
-                glb
-            );
+            `${encodeURIComponent(currentScanId)}/` +
+            cleanPath;
 
+        console.log(
+            "3D-Modell:",
+            url
+        );
 
-        modelViewer.src =
-            url;
-
+        modelViewer.src = url;
 
         viewerCard.style.display =
             "block";
     }
 
 
-    downloadList.innerHTML =
-        "";
+    downloadList.innerHTML = "";
 
 
-    for (
-        const file of files
-    ) {
+    for (const file of files) {
 
         const button =
-            document.createElement(
-                "a"
-            );
-
+            document.createElement("a");
 
         button.className =
             "download-button";
 
+        const cleanPath =
+            file
+                .split("/")
+                .map(part =>
+                    encodeURIComponent(part)
+                )
+                .join("/");
 
         button.href =
             `/api/download/` +
-            `${currentScanId}/` +
-            encodeURIComponent(
-                file
-            );
-
+            `${encodeURIComponent(currentScanId)}/` +
+            cleanPath;
 
         button.download =
-            file.split(
-                "/"
-            ).pop();
-
+            file.split("/").pop();
 
         button.textContent =
             "⬇️ " +
-            file.split(
-                "/"
-            ).pop();
-
+            file.split("/").pop();
 
         downloadList.appendChild(
             button
@@ -1479,27 +854,21 @@ function showFinished(
     }
 
 
-    if (
-        files.length > 0
-    ) {
+    if (files.length > 0) {
 
         downloadCard.style.display =
             "block";
     }
 
-
-    createButton.disabled =
-        false;
+    createButton.disabled = false;
 }
 
 
 /* =========================
-   STATUS-HILFEN
+   HILFSFUNKTIONEN
 ========================= */
 
-function setStatus(
-    message
-) {
+function setStatus(message) {
 
     statusMessage.className =
         "status-message";
@@ -1509,9 +878,7 @@ function setStatus(
 }
 
 
-function setError(
-    message
-) {
+function setError(message) {
 
     statusMessage.className =
         "status-message error";
@@ -1521,9 +888,7 @@ function setError(
 }
 
 
-function setSuccess(
-    message
-) {
+function setSuccess(message) {
 
     statusMessage.className =
         "status-message success";
@@ -1533,16 +898,22 @@ function setSuccess(
 }
 
 
-function setProgress(
-    value
-) {
+function setProgress(value) {
+
+    const safeValue =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                Number(value) || 0
+            )
+        );
 
     progressBar.style.width =
-        `${value}%`;
+        `${safeValue}%`;
 }
-
 </script>
 
 </body>
-
 </html>
+```
