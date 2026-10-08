@@ -16,63 +16,77 @@ const ALICEVISION_ROOT =
     "/opt/AliceVision/AV_bundle";
 
 const ALICEVISION_BIN =
-    path.join(ALICEVISION_ROOT, "bin");
+    path.join(
+        ALICEVISION_ROOT,
+        "bin"
+    );
+
+const SENSOR_DATABASE =
+    fs.existsSync(
+        path.join(
+            ALICEVISION_ROOT,
+            "cameraSensors.db"
+        )
+    )
+        ? path.join(
+            ALICEVISION_ROOT,
+            "cameraSensors.db"
+        )
+        : path.join(
+            ALICEVISION_ROOT,
+            "share",
+            "aliceVision",
+            "cameraSensors.db"
+        );
 
 const AV = {
-    cameraInit: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_cameraInit"
-    ),
+    cameraInit:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_cameraInit"
+        ),
 
-    featureExtraction: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_featureExtraction"
-    ),
+    featureExtraction:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_featureExtraction"
+        ),
 
-    imageMatching: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_imageMatching"
-    ),
+    imageMatching:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_imageMatching"
+        ),
 
-    featureMatching: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_featureMatching"
-    ),
+    featureMatching:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_featureMatching"
+        ),
 
-    incrementalSfM: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_incrementalSfM"
-    ),
+    incrementalSfM:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_incrementalSfM"
+        ),
 
-    prepareDenseScene: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_prepareDenseScene"
-    ),
+    meshing:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_meshing"
+        ),
 
-    depthMapEstimation: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_depthMapEstimation"
-    ),
+    meshFiltering:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_meshFiltering"
+        ),
 
-    depthMapFiltering: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_depthMapFiltering"
-    ),
-
-    meshing: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_meshing"
-    ),
-
-    meshFiltering: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_meshFiltering"
-    ),
-
-    texturing: path.join(
-        ALICEVISION_BIN,
-        "aliceVision_texturing"
-    )
+    texturing:
+        path.join(
+            ALICEVISION_BIN,
+            "aliceVision_texturing"
+        )
 };
 
 fs.mkdirSync(
@@ -153,7 +167,7 @@ function updateStatus(id, data) {
     );
 }
 
-function programExists(file) {
+function exists(file) {
     try {
         return (
             fs.existsSync(file) &&
@@ -164,11 +178,41 @@ function programExists(file) {
     }
 }
 
-function getMissingPrograms() {
-    return Object.entries(AV)
+function requiredPrograms() {
+    return {
+        cameraInit:
+            AV.cameraInit,
+
+        featureExtraction:
+            AV.featureExtraction,
+
+        imageMatching:
+            AV.imageMatching,
+
+        featureMatching:
+            AV.featureMatching,
+
+        incrementalSfM:
+            AV.incrementalSfM,
+
+        meshing:
+            AV.meshing,
+
+        meshFiltering:
+            AV.meshFiltering,
+
+        texturing:
+            AV.texturing
+    };
+}
+
+function missingPrograms() {
+    return Object.entries(
+        requiredPrograms()
+    )
         .filter(
             ([, file]) =>
-                !programExists(file)
+                !exists(file)
         )
         .map(
             ([name]) =>
@@ -179,7 +223,8 @@ function getMissingPrograms() {
 function run(command, args, cwd) {
     return new Promise(
         (resolve, reject) => {
-            if (!programExists(command)) {
+
+            if (!exists(command)) {
                 reject(
                     new Error(
                         "Programm nicht gefunden: " +
@@ -194,16 +239,20 @@ function run(command, args, cwd) {
                 "========================================"
             );
             console.log(
-                "START:",
-                command
+                "START:"
+            );
+            console.log(command);
+            console.log(
+                "ARGUMENTE:"
             );
             console.log(
-                "ARGS:",
                 args.join(" ")
             );
             console.log(
                 "========================================"
             );
+
+            let output = "";
 
             const child =
                 spawn(
@@ -213,9 +262,13 @@ function run(command, args, cwd) {
                         cwd,
                         env: {
                             ...process.env,
-                            ALICEVISION_ROOT,
+
+                            ALICEVISION_ROOT:
+                                ALICEVISION_ROOT,
+
                             ALICEVISION_INSTALL:
                                 ALICEVISION_ROOT,
+
                             PATH:
                                 ALICEVISION_BIN +
                                 ":" +
@@ -223,6 +276,7 @@ function run(command, args, cwd) {
                                     process.env.PATH ||
                                     ""
                                 ),
+
                             LD_LIBRARY_PATH:
                                 ALICEVISION_ROOT +
                                 "/lib:" +
@@ -233,6 +287,7 @@ function run(command, args, cwd) {
                                     ""
                                 )
                         },
+
                         stdio: [
                             "ignore",
                             "pipe",
@@ -244,8 +299,13 @@ function run(command, args, cwd) {
             child.stdout.on(
                 "data",
                 data => {
+                    const text =
+                        data.toString();
+
+                    output += text;
+
                     process.stdout.write(
-                        data.toString()
+                        text
                     );
                 }
             );
@@ -253,8 +313,13 @@ function run(command, args, cwd) {
             child.stderr.on(
                 "data",
                 data => {
+                    const text =
+                        data.toString();
+
+                    output += text;
+
                     process.stderr.write(
-                        data.toString()
+                        text
                     );
                 }
             );
@@ -262,24 +327,37 @@ function run(command, args, cwd) {
             child.on(
                 "error",
                 error => {
-                    reject(error);
+                    const message =
+                        error.message +
+                        "\n" +
+                        output.slice(-12000);
+
+                    reject(
+                        new Error(message)
+                    );
                 }
             );
 
             child.on(
                 "close",
                 code => {
+
                     if (code === 0) {
-                        resolve();
-                    } else {
-                        reject(
-                            new Error(
-                                command +
-                                " beendet mit Fehlercode " +
-                                code
-                            )
+                        resolve(
+                            output
                         );
+                        return;
                     }
+
+                    reject(
+                        new Error(
+                            command +
+                            " beendet mit Fehlercode " +
+                            code +
+                            "\n\n" +
+                            output.slice(-12000)
+                        )
+                    );
                 }
             );
         }
@@ -329,83 +407,199 @@ function findFiles(directory) {
     return result;
 }
 
-const storage =
-    multer.diskStorage({
-        destination:
-            (req, file, callback) => {
-                callback(
-                    null,
-                    req.scanImagesDir
-                );
-            },
+function findFirstFile(
+    directory,
+    extensions
+) {
+    if (!fs.existsSync(directory)) {
+        return null;
+    }
 
-        filename:
-            (req, file, callback) => {
-                const extension =
-                    path.extname(
-                        file.originalname
-                    ).toLowerCase();
+    let found = null;
 
-                const filename =
-                    Date.now() +
-                    "-" +
-                    crypto
-                        .randomBytes(6)
-                        .toString("hex") +
-                    extension;
+    function walk(current) {
+        if (found) {
+            return;
+        }
 
-                callback(
-                    null,
-                    filename
-                );
+        const entries =
+            fs.readdirSync(
+                current,
+                {
+                    withFileTypes: true
+                }
+            );
+
+        for (
+            const entry of entries
+        ) {
+            if (found) {
+                break;
             }
-    });
 
-const upload =
-    multer({
-        storage,
+            const full =
+                path.join(
+                    current,
+                    entry.name
+                );
 
-        limits: {
-            files: 100,
-            fileSize:
-                100 *
-                1024 *
-                1024
-        },
-
-        fileFilter:
-            (req, file, callback) => {
-                const allowed = [
-                    ".jpg",
-                    ".jpeg",
-                    ".png",
-                    ".webp"
-                ];
-
-                const extension =
+            if (entry.isDirectory()) {
+                walk(full);
+            } else {
+                const ext =
                     path.extname(
-                        file.originalname
+                        entry.name
                     ).toLowerCase();
 
                 if (
-                    !allowed.includes(
-                        extension
+                    extensions.includes(
+                        ext
                     )
                 ) {
-                    callback(
-                        new Error(
-                            "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
-                        )
-                    );
-                    return;
+                    found = full;
                 }
+            }
+        }
+    }
 
-                callback(
-                    null,
-                    true
+    walk(directory);
+
+    return found;
+}
+
+async function textureWithFallback(
+    root,
+    sfmFile,
+    meshFile,
+    textureDir
+) {
+    const sizes = [
+        32768,
+        16384,
+        8192
+    ];
+
+    let lastError = null;
+
+    for (
+        const size of sizes
+    ) {
+        try {
+            if (
+                fs.existsSync(
+                    textureDir
+                )
+            ) {
+                fs.rmSync(
+                    textureDir,
+                    {
+                        recursive: true,
+                        force: true
+                    }
                 );
             }
-    });
+
+            fs.mkdirSync(
+                textureDir,
+                {
+                    recursive: true
+                }
+            );
+
+            await run(
+                AV.texturing,
+                [
+                    "--input",
+                    sfmFile,
+
+                    "--inputMesh",
+                    meshFile,
+
+                    "--output",
+                    textureDir,
+
+                    "--textureSide",
+                    String(size),
+
+                    "--outputTextureFileType",
+                    "png",
+
+                    "--unwrapMethod",
+                    "Basic",
+
+                    "--useUDIM",
+                    "True",
+
+                    "--fillHoles",
+                    "False",
+
+                    "--padding",
+                    "5",
+
+                    "--useScore",
+                    "True",
+
+                    "--bestScoreThreshold",
+                    "0.1",
+
+                    "--angleHardThreshold",
+                    "90",
+
+                    "--correctEV",
+                    "False",
+
+                    "--forceVisibleByAllVertices",
+                    "False",
+
+                    "--visibilityRemappingMethod",
+                    "PullPush",
+
+                    "--subdivisionTargetRatio",
+                    "0",
+
+                    "--verboseLevel",
+                    "info"
+                ],
+                root
+            );
+
+            const texturedMesh =
+                findFirstFile(
+                    textureDir,
+                    [
+                        ".obj",
+                        ".gltf",
+                        ".glb"
+                    ]
+                );
+
+            if (
+                texturedMesh ||
+                findFirstFile(
+                    textureDir,
+                    [".png"]
+                )
+            ) {
+                return {
+                    success: true,
+                    size
+                };
+            }
+
+            throw new Error(
+                "Texturing hat keine Ausgabedateien erzeugt."
+            );
+
+        } catch (error) {
+            lastError = error;
+        }
+    }
+
+    throw lastError ||
+        new Error(
+            "Texturierung fehlgeschlagen."
+        );
+}
 
 async function createModel(id) {
     const root =
@@ -441,18 +635,6 @@ async function createModel(id) {
             "sfm"
         );
 
-    const dense =
-        path.join(
-            root,
-            "dense"
-        );
-
-    const depth =
-        path.join(
-            root,
-            "depth"
-        );
-
     const mesh =
         path.join(
             root,
@@ -465,9 +647,34 @@ async function createModel(id) {
             "texture"
         );
 
+    const cameraInitFile =
+        path.join(
+            camera,
+            "cameraInit.sfm"
+        );
+
+    const sfmFile =
+        path.join(
+            sfm,
+            "sfm.abc"
+        );
+
+    const meshFile =
+        path.join(
+            mesh,
+            "mesh.obj"
+        );
+
+    const filteredMesh =
+        path.join(
+            mesh,
+            "filtered.obj"
+        );
+
     try {
+
         const missing =
-            getMissingPrograms();
+            missingPrograms();
 
         if (missing.length > 0) {
             throw new Error(
@@ -476,59 +683,87 @@ async function createModel(id) {
             );
         }
 
+        if (
+            !fs.existsSync(
+                SENSOR_DATABASE
+            )
+        ) {
+            throw new Error(
+                "cameraSensors.db nicht gefunden: " +
+                SENSOR_DATABASE
+            );
+        }
+
+        const imageFiles =
+            findFiles(images)
+                .filter(
+                    file => {
+                        const ext =
+                            path.extname(
+                                file
+                            ).toLowerCase();
+
+                        return [
+                            ".jpg",
+                            ".jpeg",
+                            ".png",
+                            ".webp"
+                        ].includes(ext);
+                    }
+                );
+
+        if (
+            imageFiles.length < 2
+        ) {
+            throw new Error(
+                "Zu wenige Bilder."
+            );
+        }
+
         fs.mkdirSync(
             camera,
-            { recursive: true }
+            {
+                recursive: true
+            }
         );
 
         fs.mkdirSync(
             features,
-            { recursive: true }
+            {
+                recursive: true
+            }
         );
 
         fs.mkdirSync(
             matches,
-            { recursive: true }
+            {
+                recursive: true
+            }
         );
 
         fs.mkdirSync(
             sfm,
-            { recursive: true }
-        );
-
-        fs.mkdirSync(
-            dense,
-            { recursive: true }
-        );
-
-        fs.mkdirSync(
-            depth,
-            { recursive: true }
+            {
+                recursive: true
+            }
         );
 
         fs.mkdirSync(
             mesh,
-            { recursive: true }
+            {
+                recursive: true
+            }
         );
-
-        fs.mkdirSync(
-            texture,
-            { recursive: true }
-        );
-
-        const sensorDatabase =
-            path.join(
-                ALICEVISION_ROOT,
-                "cameraSensors.db"
-            );
 
         updateStatus(
             id,
             {
-                state: "processing",
+                state:
+                    "processing",
                 step:
                     "Kameras erkennen",
-                progress: 5
+                progress:
+                    5
             }
         );
 
@@ -539,7 +774,7 @@ async function createModel(id) {
                 images,
 
                 "--sensorDatabase",
-                sensorDatabase,
+                SENSOR_DATABASE,
 
                 "--defaultFieldOfView",
                 "45",
@@ -547,24 +782,41 @@ async function createModel(id) {
                 "--groupCameraFallback",
                 "folder",
 
+                "--viewIdMethod",
+                "filename",
+
+                "--viewIdRegex",
+                ".*?(\\d+)",
+
+                "--allowSingleView",
+                "1",
+
                 "--verboseLevel",
                 "info",
 
                 "--output",
-                path.join(
-                    camera,
-                    "cameraInit.sfm"
-                )
+                cameraInitFile
             ],
             root
         );
+
+        if (
+            !fs.existsSync(
+                cameraInitFile
+            )
+        ) {
+            throw new Error(
+                "cameraInit.sfm wurde nicht erzeugt."
+            );
+        }
 
         updateStatus(
             id,
             {
                 step:
                     "Bildmerkmale berechnen",
-                progress: 18
+                progress:
+                    18
             }
         );
 
@@ -572,19 +824,25 @@ async function createModel(id) {
             AV.featureExtraction,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameraInit.sfm"
-                ),
-
-                "--output",
-                features,
+                cameraInitFile,
 
                 "--describerTypes",
-                "SIFT",
+                "sift",
+
+                "--describerPreset",
+                "normal",
+
+                "--forceCpuExtraction",
+                "True",
+
+                "--maxThreads",
+                "0",
 
                 "--verboseLevel",
-                "info"
+                "info",
+
+                "--output",
+                features
             ],
             root
         );
@@ -594,7 +852,8 @@ async function createModel(id) {
             {
                 step:
                     "Bilder vergleichen",
-                progress: 30
+                progress:
+                    30
             }
         );
 
@@ -602,32 +861,55 @@ async function createModel(id) {
             AV.imageMatching,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameraInit.sfm"
-                ),
+                cameraInitFile,
 
                 "--featuresFolders",
                 features,
+
+                "--method",
+                "Exhaustive",
+
+                "--maxDescriptors",
+                "0",
+
+                "--nbMatches",
+                "0",
+
+                "--verboseLevel",
+                "info",
 
                 "--output",
                 path.join(
                     matches,
                     "imageMatches.txt"
-                ),
-
-                "--verboseLevel",
-                "info"
+                )
             ],
             root
         );
+
+        const imageMatches =
+            path.join(
+                matches,
+                "imageMatches.txt"
+            );
+
+        if (
+            !fs.existsSync(
+                imageMatches
+            )
+        ) {
+            throw new Error(
+                "imageMatches.txt wurde nicht erzeugt."
+            );
+        }
 
         updateStatus(
             id,
             {
                 step:
                     "Merkmale abgleichen",
-                progress: 38
+                progress:
+                    40
             }
         );
 
@@ -635,25 +917,52 @@ async function createModel(id) {
             AV.featureMatching,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameraInit.sfm"
-                ),
+                cameraInitFile,
 
                 "--featuresFolders",
                 features,
 
                 "--imagePairsList",
-                path.join(
-                    matches,
-                    "imageMatches.txt"
-                ),
+                imageMatches,
 
-                "--output",
-                matches,
+                "--describerTypes",
+                "sift",
+
+                "--photometricMatchingMethod",
+                "ANN_L2",
+
+                "--geometricEstimator",
+                "acransac",
+
+                "--geometricFilterType",
+                "fundamental_matrix",
+
+                "--distanceRatio",
+                "0.8",
+
+                "--maxIteration",
+                "2048",
+
+                "--geometricError",
+                "0.0",
+
+                "--maxMatches",
+                "0",
+
+                "--savePutativeMatches",
+                "False",
+
+                "--guidedMatching",
+                "False",
+
+                "--exportDebugFiles",
+                "False",
 
                 "--verboseLevel",
-                "info"
+                "info",
+
+                "--output",
+                matches
             ],
             root
         );
@@ -662,31 +971,41 @@ async function createModel(id) {
             id,
             {
                 step:
-                    "Kamera-Positionen berechnen",
-                progress: 48
+                    "3D-Kamera-Positionen berechnen",
+                progress:
+                    52
             }
         );
-
-        const sfmFile =
-            path.join(
-                sfm,
-                "sfm.abc"
-            );
 
         await run(
             AV.incrementalSfM,
             [
                 "--input",
-                path.join(
-                    camera,
-                    "cameraInit.sfm"
-                ),
+                cameraInitFile,
 
                 "--featuresFolders",
                 features,
 
                 "--matchesFolders",
                 matches,
+
+                "--describerTypes",
+                "sift",
+
+                "--computeStructureColor",
+                "True",
+
+                "--useAutoTransform",
+                "True",
+
+                "--minNumberOfObservationsForTriangulation",
+                "2",
+
+                "--maxNumberOfMatches",
+                "0",
+
+                "--minNumberOfMatches",
+                "0",
 
                 "--output",
                 sfmFile,
@@ -697,38 +1016,8 @@ async function createModel(id) {
                     "cameras.sfm"
                 ),
 
-                "--verboseLevel",
-                "info"
-            ],
-            root
-        );
-
-        updateStatus(
-            id,
-            {
-                step:
-                    "Bilder für die Tiefenberechnung vorbereiten",
-                progress: 56
-            }
-        );
-
-        const denseImages =
-            path.join(
-                dense,
-                "images"
-            );
-
-        await run(
-            AV.prepareDenseScene,
-            [
-                "--input",
-                sfmFile,
-
-                "--outputFileType",
-                "exr",
-
-                "--output",
-                denseImages,
+                "--extraInfoFolder",
+                sfm,
 
                 "--verboseLevel",
                 "info"
@@ -736,112 +1025,25 @@ async function createModel(id) {
             root
         );
 
-        updateStatus(
-            id,
-            {
-                step:
-                    "Tiefenkarten berechnen",
-                progress: 65
-            }
-        );
-
-        await run(
-            AV.depthMapEstimation,
-            [
-                "--input",
-                sfmFile,
-
-                "--imagesFolder",
-                denseImages,
-
-                "--downscale",
-                "2",
-
-                "--minViewAngle",
-                "2.0",
-
-                "--maxViewAngle",
-                "70.0",
-
-                "--nbGPUs",
-                "0",
-
-                "--verboseLevel",
-                "info",
-
-                "--output",
-                depth
-            ],
-            root
-        );
-
-        updateStatus(
-            id,
-            {
-                step:
-                    "Tiefenkarten filtern",
-                progress: 72
-            }
-        );
-
-        const filteredDepth =
-            path.join(
-                root,
-                "depthFiltered"
+        if (
+            !fs.existsSync(
+                sfmFile
+            )
+        ) {
+            throw new Error(
+                "sfm.abc wurde nicht erzeugt."
             );
-
-        fs.mkdirSync(
-            filteredDepth,
-            { recursive: true }
-        );
-
-        await run(
-            AV.depthMapFiltering,
-            [
-                "--input",
-                sfmFile,
-
-                "--depthMapsFolder",
-                depth,
-
-                "--minViewAngle",
-                "2.0",
-
-                "--maxViewAngle",
-                "70.0",
-
-                "--nNearestCams",
-                "10",
-
-                "--minNumOfConsistentCams",
-                "3",
-
-                "--minNumOfConsistentCamsWithLowSimilarity",
-                "4",
-
-                "--verboseLevel",
-                "info",
-
-                "--output",
-                filteredDepth
-            ],
-            root
-        );
+        }
 
         updateStatus(
             id,
             {
                 step:
-                    "3D-Mesh erstellen",
-                progress: 80
+                    "CPU-3D-Mesh erstellen",
+                progress:
+                    70
             }
         );
-
-        const meshFile =
-            path.join(
-                mesh,
-                "mesh.obj"
-            );
 
         await run(
             AV.meshing,
@@ -849,20 +1051,71 @@ async function createModel(id) {
                 "--input",
                 sfmFile,
 
-                "--depthMapsFolder",
-                depth,
-
-                "--depthMapsFilterFolder",
-                filteredDepth,
-
                 "--estimateSpaceFromSfM",
                 "True",
+
+                "--estimateSpaceMinObservations",
+                "2",
+
+                "--estimateSpaceMinObservationAngle",
+                "5",
 
                 "--maxInputPoints",
                 "50000000",
 
                 "--maxPoints",
-                "5000000",
+                "10000000",
+
+                "--maxPointsPerVoxel",
+                "1000000",
+
+                "--minStep",
+                "1",
+
+                "--partitioning",
+                "singleBlock",
+
+                "--repartition",
+                "multiResolution",
+
+                "--angleFactor",
+                "15",
+
+                "--simFactor",
+                "15",
+
+                "--pixSizeMarginInitCoef",
+                "2",
+
+                "--pixSizeMarginFinalCoef",
+                "4",
+
+                "--voteMarginFactor",
+                "4",
+
+                "--contributeMarginFactor",
+                "2",
+
+                "--simGaussianSizeInit",
+                "10",
+
+                "--simGaussianSize",
+                "10",
+
+                "--minAngleThreshold",
+                "1",
+
+                "--refineFuse",
+                "True",
+
+                "--addLandmarksToTheDensePointCloud",
+                "True",
+
+                "--colorizeOutput",
+                "True",
+
+                "--saveRawDensePointCloud",
+                "False",
 
                 "--verboseLevel",
                 "info",
@@ -879,65 +1132,105 @@ async function createModel(id) {
             root
         );
 
+        if (
+            !fs.existsSync(
+                meshFile
+            )
+        ) {
+            throw new Error(
+                "mesh.obj wurde nicht erzeugt."
+            );
+        }
+
         updateStatus(
             id,
             {
                 step:
                     "Mesh verbessern",
-                progress: 87
+                progress:
+                    82
             }
         );
 
-        const filteredMesh =
-            path.join(
-                mesh,
-                "filtered.obj"
+        try {
+            await run(
+                AV.meshFiltering,
+                [
+                    "--inputMesh",
+                    meshFile,
+
+                    "--keepLargestMeshOnly",
+                    "False",
+
+                    "--smoothingSubset",
+                    "all",
+
+                    "--smoothingBoundariesNeighbours",
+                    "0",
+
+                    "--smoothingIterations",
+                    "3",
+
+                    "--smoothingLambda",
+                    "1",
+
+                    "--filteringSubset",
+                    "all",
+
+                    "--filteringIterations",
+                    "1",
+
+                    "--filterLargeTrianglesFactor",
+                    "60",
+
+                    "--filterTrianglesRatio",
+                    "0",
+
+                    "--verboseLevel",
+                    "info",
+
+                    "--outputMesh",
+                    filteredMesh
+                ],
+                root
             );
-
-        await run(
-            AV.meshFiltering,
-            [
-                "--input",
+        } catch {
+            fs.copyFileSync(
                 meshFile,
+                filteredMesh
+            );
+        }
 
-                "--output",
-                filteredMesh,
-
-                "--verboseLevel",
-                "info"
-            ],
-            root
-        );
+        if (
+            !fs.existsSync(
+                filteredMesh
+            )
+        ) {
+            throw new Error(
+                "Kein fertiges Mesh vorhanden."
+            );
+        }
 
         updateStatus(
             id,
             {
                 step:
-                    "Textur erstellen",
-                progress: 94
+                    "Fototextur erstellen",
+                progress:
+                    92
             }
         );
 
-        await run(
-            AV.texturing,
-            [
-                "--input",
-                sfmFile,
-
-                "--inputMesh",
+        const textureResult =
+            await textureWithFallback(
+                root,
+                path.join(
+                    mesh,
+                    "densePointCloud.abc"
+                ),
                 filteredMesh,
-
-                "--output",
-                texture,
-
-                "--textureSide",
-                "16384",
-
-                "--verboseLevel",
-                "info"
-            ],
-            root
-        );
+                texture
+            );
 
         const files =
             findFiles(root)
@@ -953,22 +1246,48 @@ async function createModel(id) {
             {
                 state:
                     "finished",
+
                 step:
                     "Fertig",
+
                 progress:
                     100,
-                files
+
+                files,
+
+                mesh:
+                    path.relative(
+                        root,
+                        filteredMesh
+                    ),
+
+                texture:
+                    path.relative(
+                        root,
+                        texture
+                    ),
+
+                textureResolution:
+                    textureResult.size
             }
         );
 
-        console.log(
-            "SCAN FERTIG:",
-            id
-        );
     } catch (error) {
+
         console.error(
-            "SCAN FEHLER:",
+            "========================================"
+        );
+
+        console.error(
+            "SCAN FEHLER"
+        );
+
+        console.error(
             error
+        );
+
+        console.error(
+            "========================================"
         );
 
         updateStatus(
@@ -976,10 +1295,13 @@ async function createModel(id) {
             {
                 state:
                     "error",
+
                 step:
                     "Fehler",
+
                 progress:
                     0,
+
                 error:
                     error.message ||
                     String(error)
@@ -988,13 +1310,102 @@ async function createModel(id) {
     }
 }
 
+const storage =
+    multer.diskStorage({
+        destination:
+            (req, file, callback) => {
+                callback(
+                    null,
+                    req.scanImagesDir
+                );
+            },
+
+        filename:
+            (req, file, callback) => {
+
+                const extension =
+                    path.extname(
+                        file.originalname
+                    ).toLowerCase();
+
+                const filename =
+                    String(
+                        Date.now()
+                    ) +
+                    "-" +
+                    crypto
+                        .randomBytes(6)
+                        .toString(
+                            "hex"
+                        ) +
+                    extension;
+
+                callback(
+                    null,
+                    filename
+                );
+            }
+    });
+
+const upload =
+    multer({
+        storage,
+
+        limits: {
+            files:
+                100,
+
+            fileSize:
+                100 *
+                1024 *
+                1024
+        },
+
+        fileFilter:
+            (req, file, callback) => {
+
+                const allowed = [
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".webp"
+                ];
+
+                const extension =
+                    path.extname(
+                        file.originalname
+                    ).toLowerCase();
+
+                if (
+                    !allowed.includes(
+                        extension
+                    )
+                ) {
+                    callback(
+                        new Error(
+                            "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
+                        )
+                    );
+                    return;
+                }
+
+                callback(
+                    null,
+                    true
+                );
+            }
+    });
+
 app.post(
     "/api/upload",
     (req, res, next) => {
+
         const id =
             crypto
                 .randomBytes(8)
-                .toString("hex");
+                .toString(
+                    "hex"
+                );
 
         const root =
             getScanDir(id);
@@ -1022,6 +1433,7 @@ app.post(
             req,
             res,
             error => {
+
                 if (error) {
                     next(error);
                     return;
@@ -1048,10 +1460,20 @@ app.post(
                     {
                         photos:
                             count,
+
                         textureTarget:
                             30000,
+
+                        textureFallbacks:
+                            [
+                                32768,
+                                16384,
+                                8192
+                            ],
+
                         maximumTriangles:
                             750000000,
+
                         created:
                             new Date()
                                 .toISOString()
@@ -1066,10 +1488,13 @@ app.post(
                     {
                         state:
                             "queued",
+
                         step:
                             "Warte auf Verarbeitung",
+
                         progress:
                             0,
+
                         photos:
                             count
                     }
@@ -1078,8 +1503,10 @@ app.post(
                 res.json({
                     success:
                         true,
+
                     scanId:
                         id,
+
                     photos:
                         count
                 });
@@ -1093,12 +1520,15 @@ app.post(
 app.get(
     "/api/status/:id",
     (req, res) => {
+
         const file =
             getStatusFile(
                 req.params.id
             );
 
-        if (!fs.existsSync(file)) {
+        if (
+            !fs.existsSync(file)
+        ) {
             res.status(404).json({
                 error:
                     "Scan nicht gefunden."
@@ -1118,12 +1548,15 @@ app.get(
 app.get(
     "/api/scan/:id",
     (req, res) => {
+
         const root =
             getScanDir(
                 req.params.id
             );
 
-        if (!fs.existsSync(root)) {
+        if (
+            !fs.existsSync(root)
+        ) {
             res.status(404).json({
                 error:
                     "Scan nicht gefunden."
@@ -1159,6 +1592,7 @@ app.get(
 app.get(
     "/api/download/:id/{*file}",
     (req, res) => {
+
         const root =
             path.resolve(
                 SCANS_DIR,
@@ -1183,7 +1617,8 @@ app.get(
 
         if (
             !filePath.startsWith(
-                root + path.sep
+                root +
+                path.sep
             )
         ) {
             res.status(403).send(
@@ -1193,8 +1628,12 @@ app.get(
         }
 
         if (
-            !fs.existsSync(filePath) ||
-            !fs.statSync(filePath).isFile()
+            !fs.existsSync(
+                filePath
+            ) ||
+            !fs.statSync(
+                filePath
+            ).isFile()
         ) {
             res.status(404).send(
                 "Datei nicht gefunden."
@@ -1211,17 +1650,21 @@ app.get(
 app.get(
     "/api/health",
     (req, res) => {
+
         const programs = {};
 
         for (
             const [name, file]
-            of Object.entries(AV)
+            of Object.entries(
+                requiredPrograms()
+            )
         ) {
             programs[name] = {
                 path:
                     file,
+
                 exists:
-                    programExists(file)
+                    exists(file)
             };
         }
 
@@ -1235,6 +1678,14 @@ app.get(
             aliceVisionRoot:
                 ALICEVISION_ROOT,
 
+            sensorDatabase:
+                SENSOR_DATABASE,
+
+            sensorDatabaseExists:
+                fs.existsSync(
+                    SENSOR_DATABASE
+                ),
+
             programs:
                 programs
         });
@@ -1247,6 +1698,7 @@ app.get(
         res.json({
             name:
                 "AliceVision 3D Scanner",
+
             status:
                 "online"
         });
@@ -1255,6 +1707,7 @@ app.get(
 
 app.use(
     (error, req, res, next) => {
+
         console.error(
             "SERVER FEHLER:",
             error
@@ -1272,6 +1725,7 @@ app.listen(
     PORT,
     "0.0.0.0",
     () => {
+
         console.log(
             "========================================"
         );
@@ -1288,6 +1742,11 @@ app.listen(
         console.log(
             "ALICEVISION_ROOT:",
             ALICEVISION_ROOT
+        );
+
+        console.log(
+            "SENSOR DATABASE:",
+            SENSOR_DATABASE
         );
 
         console.log(
