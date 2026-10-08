@@ -1,7 +1,8 @@
+```json
 {
-  "name": "ultra-3d-scanner",
+  "name": "alicevision-3d-scanner",
   "version": "1.0.0",
-  "description": "Kostenloser hochauflösender 3D-Fotoscanner",
+  "description": "Kostenloser 3D-Fotoscanner mit AliceVision",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,3 +12,4 @@
     "multer": "^2.0.2"
   }
 }
+```
