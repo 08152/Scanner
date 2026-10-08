@@ -3,36 +3,33 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { spawn } = require("child_process");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-const ROOT = __dirname;
-const SCANS = path.join(ROOT, "scans");
+const PORT = process.env.PORT || 10000;
+const ROOT = path.join(__dirname, "scans");
 
-fs.mkdirSync(SCANS, { recursive: true });
+fs.mkdirSync(ROOT, { recursive: true });
 
-app.use(express.static(ROOT));
+app.use(express.static(__dirname));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const folder = path.join(
-            SCANS,
-            req.scanId,
-            "images"
-        );
+        const id = req.scanId;
+        const dir = path.join(ROOT, id, "images");
 
-        fs.mkdirSync(folder, { recursive: true });
-        cb(null, folder);
+        fs.mkdirSync(dir, { recursive: true });
+
+        cb(null, dir);
     },
 
     filename: (req, file, cb) => {
-        const ext =
-            path.extname(file.originalname).toLowerCase();
+        const ext = path.extname(file.originalname).toLowerCase();
 
         cb(
             null,
-            crypto.randomUUID() + ext
+            `${String(Date.now())}-${crypto.randomBytes(4).toString("hex")}${ext}`
         );
     }
 });
@@ -46,24 +43,14 @@ const upload = multer({
     },
 
     fileFilter: (req, file, cb) => {
-
         const allowed = [
-            ".jpg",
-            ".jpeg",
-            ".png",
-            ".webp"
+            "image/jpeg",
+            "image/png",
+            "image/webp"
         ];
 
-        const ext =
-            path.extname(file.originalname)
-                .toLowerCase();
-
-        if (!allowed.includes(ext)) {
-            return cb(
-                new Error(
-                    "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
-                )
-            );
+        if (!allowed.includes(file.mimetype)) {
+            return cb(new Error("Nur JPG, PNG und WebP sind erlaubt."));
         }
 
         cb(null, true);
@@ -71,234 +58,576 @@ const upload = multer({
 });
 
 
+function saveStatus(id, status, message, extra = {}) {
+    const file = path.join(ROOT, id, "status.json");
+
+    fs.writeFileSync(
+        file,
+        JSON.stringify(
+            {
+                id,
+                status,
+                message,
+                updated: new Date().toISOString(),
+                ...extra
+            },
+            null,
+            2
+        )
+    );
+}
+
+
+function runCommand(command, args, cwd, id) {
+    return new Promise((resolve, reject) => {
+
+        console.log("\nRUN:", command, args.join(" "));
+
+        const process = spawn(command, args, {
+            cwd,
+            stdio: ["ignore", "pipe", "pipe"]
+        });
+
+        let output = "";
+
+        process.stdout.on("data", data => {
+            const text = data.toString();
+
+            output += text;
+
+            console.log(text);
+        });
+
+        process.stderr.on("data", data => {
+            const text = data.toString();
+
+            output += text;
+
+            console.log(text);
+        });
+
+        process.on("error", error => {
+            reject(error);
+        });
+
+        process.on("close", code => {
+
+            if (code === 0) {
+                resolve(output);
+            } else {
+                reject(
+                    new Error(
+                        `${command} beendet mit Code ${code}`
+                    )
+                );
+            }
+        });
+    });
+}
+
+
+async function createModel(id) {
+
+    const scan = path.join(ROOT, id);
+
+    const images = path.join(scan, "images");
+    const database = path.join(scan, "database.db");
+
+    const sparse = path.join(scan, "sparse");
+    const dense = path.join(scan, "dense");
+
+    try {
+
+        saveStatus(
+            id,
+            "processing",
+            "Bilder werden analysiert..."
+        );
+
+
+        /*
+         * 1. Feature Extraction
+         */
+
+        await runCommand(
+            "colmap",
+            [
+                "feature_extractor",
+
+                "--database_path",
+                database,
+
+                "--image_path",
+                images,
+
+                "--FeatureExtraction.use_gpu",
+                "0",
+
+                "--SiftExtraction.max_num_features",
+                "8192"
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 2. Bilder miteinander vergleichen
+         */
+
+        saveStatus(
+            id,
+            "processing",
+            "Kamerapositionen werden berechnet..."
+        );
+
+        await runCommand(
+            "colmap",
+            [
+                "exhaustive_matcher",
+
+                "--database_path",
+                database,
+
+                "--FeatureMatching.use_gpu",
+                "0"
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 3. Sparse Reconstruction
+         */
+
+        fs.mkdirSync(sparse, {
+            recursive: true
+        });
+
+        await runCommand(
+            "colmap",
+            [
+                "mapper",
+
+                "--database_path",
+                database,
+
+                "--image_path",
+                images,
+
+                "--output_path",
+                sparse
+            ],
+            scan,
+            id
+        );
+
+
+        const sparseModel = path.join(
+            sparse,
+            "0"
+        );
+
+        if (!fs.existsSync(sparseModel)) {
+            throw new Error(
+                "COLMAP konnte kein zusammenhängendes 3D-Modell aus den Bildern erstellen."
+            );
+        }
+
+
+        /*
+         * 4. Dense Reconstruction
+         */
+
+        saveStatus(
+            id,
+            "processing",
+            "Hochauflösende 3D-Geometrie wird berechnet..."
+        );
+
+        fs.mkdirSync(dense, {
+            recursive: true
+        });
+
+        await runCommand(
+            "colmap",
+            [
+                "image_undistorter",
+
+                "--image_path",
+                images,
+
+                "--input_path",
+                sparseModel,
+
+                "--output_path",
+                dense,
+
+                "--output_type",
+                "COLMAP",
+
+                /*
+                 * Für Render zunächst moderat.
+                 * Später können wir diesen Wert erhöhen.
+                 */
+                "--max_image_size",
+                "3000"
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 5. Dense Stereo
+         */
+
+        await runCommand(
+            "colmap",
+            [
+                "patch_match_stereo",
+
+                "--workspace_path",
+                dense,
+
+                "--workspace_format",
+                "COLMAP",
+
+                "--PatchMatchStereo.geom_consistency",
+                "true"
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 6. Point Cloud
+         */
+
+        const fused = path.join(
+            dense,
+            "fused.ply"
+        );
+
+        await runCommand(
+            "colmap",
+            [
+                "stereo_fusion",
+
+                "--workspace_path",
+                dense,
+
+                "--workspace_format",
+                "COLMAP",
+
+                "--input_type",
+                "geometric",
+
+                "--output_path",
+                fused
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 7. Mesh
+         */
+
+        saveStatus(
+            id,
+            "processing",
+            "3D-Oberfläche wird erzeugt..."
+        );
+
+        const mesh = path.join(
+            dense,
+            "meshed-poisson.ply"
+        );
+
+        await runCommand(
+            "colmap",
+            [
+                "poisson_mesher",
+
+                "--input_path",
+                fused,
+
+                "--output_path",
+                mesh
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 8. Textur
+         */
+
+        saveStatus(
+            id,
+            "processing",
+            "Oberfläche wird texturiert..."
+        );
+
+        const textured = path.join(
+            dense,
+            "textured"
+        );
+
+        fs.mkdirSync(textured, {
+            recursive: true
+        });
+
+        await runCommand(
+            "colmap",
+            [
+                "mesh_texturer",
+
+                "--workspace_path",
+                dense,
+
+                "--input_path",
+                mesh,
+
+                "--output_path",
+                textured
+            ],
+            scan,
+            id
+        );
+
+
+        /*
+         * 9. Ergebnisse suchen
+         */
+
+        const files = [];
+
+        function collectFiles(dir) {
+
+            if (!fs.existsSync(dir)) {
+                return;
+            }
+
+            for (const file of fs.readdirSync(dir)) {
+
+                const full = path.join(dir, file);
+                const stat = fs.statSync(full);
+
+                if (stat.isDirectory()) {
+                    collectFiles(full);
+                } else {
+                    files.push(
+                        path.relative(scan, full)
+                    );
+                }
+            }
+        }
+
+        collectFiles(textured);
+
+
+        /*
+         * 10. Fertig
+         */
+
+        saveStatus(
+            id,
+            "finished",
+            "3D-Modell wurde erfolgreich erstellt.",
+            {
+                files
+            }
+        );
+
+        console.log(
+            `SCAN ${id} FERTIG`
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        saveStatus(
+            id,
+            "error",
+            error.message
+        );
+    }
+}
+
+
 /*
-    SCAN STARTEN
-*/
+ * Upload
+ */
 
 app.post(
     "/api/scan",
 
     (req, res, next) => {
+
         req.scanId = crypto.randomUUID();
+
         next();
     },
 
     upload.array("photos", 100),
 
-    (req, res) => {
+    async (req, res) => {
 
-        try {
+        const id = req.scanId;
 
-            if (
-                !req.files ||
-                req.files.length < 3
-            ) {
-                return res.status(400).json({
-                    error:
-                        "Mindestens 3 Fotos erforderlich."
-                });
-            }
+        const scan = path.join(
+            ROOT,
+            id
+        );
 
-            const id = req.scanId;
+        fs.mkdirSync(scan, {
+            recursive: true
+        });
 
-            const folder =
-                path.join(SCANS, id);
+        fs.writeFileSync(
+            path.join(scan, "settings.json"),
 
-            const result =
-                path.join(folder, "result");
+            JSON.stringify(
+                {
+                    textureTarget: 30000,
+                    textureMinimum: 10000,
+                    maximumTriangles: 750000000,
+                    photos: req.files.length
+                },
+                null,
+                2
+            )
+        );
 
-            fs.mkdirSync(
-                result,
-                { recursive: true }
-            );
-
-            const settings = {
-                photos: req.files.length,
-
-                minimumTexture:
-                    10000,
-
-                targetTexture:
-                    30000,
-
-                maximumTriangles:
-                    750000000
-            };
-
-            fs.writeFileSync(
-                path.join(
-                    folder,
-                    "settings.json"
-                ),
-                JSON.stringify(
-                    settings,
-                    null,
-                    2
-                )
-            );
-
-            /*
-                Hier wird später die
-                Photogrammetrie-Engine gestartet.
-            */
-
-            res.json({
-                success: true,
-                scanId: id,
-                photos: req.files.length,
-
-                message:
-                    "Fotos erfolgreich hochgeladen."
-            });
-
-        } catch (error) {
-
-            console.error(error);
-
-            res.status(500).json({
-                error: error.message
-            });
-        }
-    }
-);
-
-
-/*
-    STATUS
-*/
-
-app.get(
-    "/api/status/:id",
-    (req, res) => {
-
-        const folder =
-            path.join(
-                SCANS,
-                req.params.id
-            );
-
-        const result =
-            path.join(
-                folder,
-                "result"
-            );
-
-        if (!fs.existsSync(folder)) {
-            return res.status(404).json({
-                error: "Scan nicht gefunden."
-            });
-        }
-
-        const files =
-            fs.existsSync(result)
-                ? fs.readdirSync(result)
-                : [];
-
-        const downloads = files.filter(
-            file => {
-
-                const ext =
-                    path.extname(file)
-                        .toLowerCase();
-
-                return [
-                    ".glb",
-                    ".gltf",
-                    ".obj",
-                    ".mtl",
-                    ".stl",
-                    ".ply",
-                    ".fbx",
-                    ".jpg",
-                    ".jpeg",
-                    ".png"
-                ].includes(ext);
-            }
+        saveStatus(
+            id,
+            "queued",
+            "Fotos hochgeladen. 3D-Berechnung wird gestartet."
         );
 
         res.json({
-            scanId: req.params.id,
-            files: downloads
+            success: true,
+            scanId: id,
+            message: "3D-Berechnung gestartet."
+        });
+
+        /*
+         * Wichtig:
+         * Nicht auf die Berechnung warten.
+         * Render kann währenddessen weiterlaufen.
+         */
+
+        setImmediate(() => {
+            createModel(id);
         });
     }
 );
 
 
 /*
-    DOWNLOAD
-*/
+ * Status
+ */
 
 app.get(
-    "/api/download/:id/:file",
+    "/api/status/:id",
     (req, res) => {
 
-        const id =
-            req.params.id;
+        const id = req.params.id;
 
-        const file =
-            path.basename(
-                req.params.file
-            );
+        const file = path.join(
+            ROOT,
+            id,
+            "status.json"
+        );
 
-        const filePath =
-            path.join(
-                SCANS,
-                id,
-                "result",
-                file
-            );
+        if (!fs.existsSync(file)) {
 
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).send(
-                "Datei wurde noch nicht erstellt."
-            );
+            return res.status(404).json({
+                error: "Scan nicht gefunden."
+            });
         }
 
-        res.download(
-            filePath,
-            file
+        const status = JSON.parse(
+            fs.readFileSync(file, "utf8")
         );
+
+        res.json(status);
     }
 );
 
 
 /*
-    SERVER
-*/
+ * Download
+ */
+
+app.get(
+    "/api/download/:id/*file",
+    (req, res) => {
+
+        const id = req.params.id;
+
+        const requested =
+            req.params.file;
+
+        const scan = path.join(
+            ROOT,
+            id
+        );
+
+        const file = path.resolve(
+            scan,
+            requested
+        );
+
+        if (
+            !file.startsWith(
+                path.resolve(scan) +
+                path.sep
+            )
+        ) {
+            return res.status(403).send(
+                "Nicht erlaubt."
+            );
+        }
+
+        if (!fs.existsSync(file)) {
+            return res.status(404).send(
+                "Datei nicht gefunden."
+            );
+        }
+
+        res.download(file);
+    }
+);
+
+
+/*
+ * Fehlerbehandlung
+ */
+
+app.use((error, req, res, next) => {
+
+    console.error(error);
+
+    res.status(500).json({
+        error: error.message
+    });
+});
+
 
 app.listen(
     PORT,
     "0.0.0.0",
     () => {
-
-        console.log("");
         console.log(
-            "=============================="
+            `3D Scanner läuft auf Port ${PORT}`
         );
-
-        console.log(
-            "ULTRA 3D SCANNER"
-        );
-
-        console.log(
-            `Port: ${PORT}`
-        );
-
-        console.log(
-            "Textur: bis 30K"
-        );
-
-        console.log(
-            "Mesh: bis 750 Mio. Dreiecke"
-        );
-
-        console.log(
-            "Export: GLB / OBJ / STL"
-        );
-
-        console.log(
-            "=============================="
-        );
-
     }
 );
