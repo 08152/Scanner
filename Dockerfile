@@ -2,41 +2,95 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Grundsystem + COLMAP
+WORKDIR /app
+
+# Grundpakete
 RUN apt-get update && \
     apt-get install -y \
-        nodejs \
-        npm \
-        colmap \
-        assimp \
-        python3 \
-        python3-pip \
-        ca-certificates \
-        git \
-        wget \
-        unzip && \
-    rm -rf /var/lib/apt/lists/*
+    software-properties-common \
+    ca-certificates \
+    wget \
+    git \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    nodejs \
+    npm \
+    python3 \
+    python3-pip \
+    libboost-all-dev \
+    libeigen3-dev \
+    libfreeimage-dev \
+    libgoogle-glog-dev \
+    libgflags-dev \
+    libsqlite3-dev \
+    libceres-dev \
+    libflann-dev \
+    libmetis-dev \
+    libglew-dev \
+    libqt5opengl5-dev \
+    qtbase5-dev \
+    qttools5-dev \
+    libqt5svg5-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
+    libopenimageio-dev \
+    libopencv-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libxxhash-dev \
+    libassimp-dev \
+    assimp-utils \
+    && rm -rf /var/lib/apt/lists/*
 
-# Prüfen, ob COLMAP wirklich installiert wurde
+
+# ==========================================
+# COLMAP aus dem Quellcode bauen
+# ==========================================
+
+WORKDIR /tmp
+
+RUN git clone --depth 1 https://github.com/colmap/colmap.git
+
+WORKDIR /tmp/colmap
+
+RUN mkdir build && \
+    cd build && \
+    cmake .. \
+        -GNinja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCUDA_ENABLED=OFF \
+        -DGUI_ENABLED=OFF && \
+    ninja -j2 && \
+    ninja install
+
+
+# ==========================================
+# Prüfen
+# ==========================================
+
 RUN which colmap
 RUN colmap -h
 
+
+# ==========================================
+# App
+# ==========================================
+
 WORKDIR /app
 
-# Node-Abhängigkeiten zuerst installieren
 COPY package.json ./
 
 RUN npm install
 
-# Projekt kopieren
 COPY . .
 
-# Scan-Ordner
 RUN mkdir -p /app/scans
 
-# Render-Port
 ENV PORT=10000
+
 EXPOSE 10000
 
-# Server starten
 CMD ["node", "server.js"]
