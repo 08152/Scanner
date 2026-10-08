@@ -4,10 +4,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Grundpakete
+# ==========================================
+# System
+# ==========================================
+
 RUN apt-get update && \
     apt-get install -y \
-    software-properties-common \
     ca-certificates \
     wget \
     git \
@@ -47,7 +49,7 @@ RUN apt-get update && \
 
 
 # ==========================================
-# COLMAP aus dem Quellcode bauen
+# COLMAP
 # ==========================================
 
 WORKDIR /tmp
@@ -71,8 +73,11 @@ RUN mkdir build && \
 # Prüfen
 # ==========================================
 
-RUN which colmap
-RUN colmap -h
+RUN echo "===== COLMAP =====" && \
+    find /usr /opt -type f -name colmap 2>/dev/null || true
+
+RUN echo "===== ASSIMP =====" && \
+    find /usr /opt -type f -name assimp 2>/dev/null || true
 
 
 # ==========================================
