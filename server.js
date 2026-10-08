@@ -3,43 +3,36 @@ const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { spawn } = require("child_process");
 
 const app = express();
-
 const PORT = process.env.PORT || 3000;
 
 const ROOT = __dirname;
 const SCANS = path.join(ROOT, "scans");
 
-if (!fs.existsSync(SCANS)) {
-    fs.mkdirSync(SCANS, { recursive: true });
-}
+fs.mkdirSync(SCANS, { recursive: true });
 
 app.use(express.static(ROOT));
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const id = req.scanId;
-
         const folder = path.join(
             SCANS,
-            id,
+            req.scanId,
             "images"
         );
 
         fs.mkdirSync(folder, { recursive: true });
-
         cb(null, folder);
     },
 
     filename: (req, file, cb) => {
-        const extension =
+        const ext =
             path.extname(file.originalname).toLowerCase();
 
         cb(
             null,
-            crypto.randomUUID() + extension
+            crypto.randomUUID() + ext
         );
     }
 });
@@ -53,6 +46,7 @@ const upload = multer({
     },
 
     fileFilter: (req, file, cb) => {
+
         const allowed = [
             ".jpg",
             ".jpeg",
@@ -66,13 +60,20 @@ const upload = multer({
 
         if (!allowed.includes(ext)) {
             return cb(
-                new Error("Nur JPG, PNG und WEBP sind erlaubt.")
+                new Error(
+                    "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
+                )
             );
         }
 
         cb(null, true);
     }
 });
+
+
+/*
+    SCAN STARTEN
+*/
 
 app.post(
     "/api/scan",
@@ -84,74 +85,70 @@ app.post(
 
     upload.array("photos", 100),
 
-    async (req, res) => {
+    (req, res) => {
 
         try {
 
-            if (!req.files || req.files.length < 3) {
+            if (
+                !req.files ||
+                req.files.length < 3
+            ) {
                 return res.status(400).json({
-                    error: "Mindestens 3 Fotos werden benötigt."
+                    error:
+                        "Mindestens 3 Fotos erforderlich."
                 });
             }
 
-            const scanId = req.scanId;
+            const id = req.scanId;
 
-            const scanFolder =
-                path.join(SCANS, scanId);
+            const folder =
+                path.join(SCANS, id);
 
-            const imagesFolder =
-                path.join(scanFolder, "images");
+            const result =
+                path.join(folder, "result");
 
-            const resultFolder =
-                path.join(scanFolder, "result");
-
-            fs.mkdirSync(resultFolder, {
-                recursive: true
-            });
+            fs.mkdirSync(
+                result,
+                { recursive: true }
+            );
 
             const settings = {
-                textureResolution: 30000,
-                minimumTextureResolution: 10000,
-                maximumTriangles: 750000000,
                 photos: req.files.length,
-                created: new Date().toISOString()
+
+                minimumTexture:
+                    10000,
+
+                targetTexture:
+                    30000,
+
+                maximumTriangles:
+                    750000000
             };
 
             fs.writeFileSync(
-                path.join(scanFolder, "settings.json"),
-                JSON.stringify(settings, null, 2)
+                path.join(
+                    folder,
+                    "settings.json"
+                ),
+                JSON.stringify(
+                    settings,
+                    null,
+                    2
+                )
             );
-
-            console.log("");
-            console.log("=================================");
-            console.log("NEUER 3D-SCAN");
-            console.log("=================================");
-            console.log("Scan:", scanId);
-            console.log("Fotos:", req.files.length);
-            console.log("Texturziel: 30K");
-            console.log("Min. Textur: 10K");
-            console.log("Meshziel: 750 Mio. Dreiecke");
-            console.log("=================================");
 
             /*
-             * Hier wird später die eigentliche
-             * Photogrammetrie-Engine gestartet.
-             *
-             * Der Server versucht zunächst,
-             * COLMAP zu finden.
-             */
-
-            startColmap(
-                scanFolder,
-                imagesFolder,
-                resultFolder
-            );
+                Hier wird später die
+                Photogrammetrie-Engine gestartet.
+            */
 
             res.json({
                 success: true,
-                scanId,
+                scanId: id,
                 photos: req.files.length,
-                settings
+
+                message:
+                    "Fotos erfolgreich hochgeladen."
             });
 
         } catch (error) {
@@ -165,97 +162,10 @@ app.post(
     }
 );
 
-function startColmap(
-    scanFolder,
-    imagesFolder,
-    resultFolder
-) {
 
-    console.log("Starte COLMAP...");
-
-    const args = [
-        "automatic_reconstructor",
-
-        "--workspace_path",
-        scanFolder,
-
-        "--image_path",
-        imagesFolder,
-
-        "--quality",
-        "extreme",
-
-        "--data_type",
-        "individual"
-    ];
-
-    const process = spawn(
-        "colmap",
-        args,
-        {
-            shell: false
-        }
-    );
-
-    process.stdout.on(
-        "data",
-        data => {
-            console.log(
-                "[COLMAP]",
-                data.toString()
-            );
-        }
-    );
-
-    process.stderr.on(
-        "data",
-        data => {
-            console.error(
-                "[COLMAP]",
-                data.toString()
-            );
-        }
-    );
-
-    process.on(
-        "error",
-        error => {
-
-            console.log(
-                "COLMAP konnte nicht gestartet werden."
-            );
-
-            console.log(
-                "Die Upload-Funktion funktioniert trotzdem."
-            );
-
-            console.log(
-                "Später wird die Engine direkt in den Server eingebaut."
-            );
-        }
-    );
-
-    process.on(
-        "close",
-        code => {
-
-            console.log(
-                "COLMAP beendet. Code:",
-                code
-            );
-
-            /*
-             * Hier kommt anschließend:
-             *
-             * Dense Reconstruction
-             * Mesh-Erzeugung
-             * Texturierung
-             * 30K-Textur
-             * GLB/OBJ/STL-Export
-             */
-        }
-    );
-}
+/*
+    STATUS
+*/
 
 app.get(
     "/api/status/:id",
@@ -267,18 +177,94 @@ app.get(
                 req.params.id
             );
 
+        const result =
+            path.join(
+                folder,
+                "result"
+            );
+
         if (!fs.existsSync(folder)) {
             return res.status(404).json({
                 error: "Scan nicht gefunden."
             });
         }
 
+        const files =
+            fs.existsSync(result)
+                ? fs.readdirSync(result)
+                : [];
+
+        const downloads = files.filter(
+            file => {
+
+                const ext =
+                    path.extname(file)
+                        .toLowerCase();
+
+                return [
+                    ".glb",
+                    ".gltf",
+                    ".obj",
+                    ".mtl",
+                    ".stl",
+                    ".ply",
+                    ".fbx",
+                    ".jpg",
+                    ".jpeg",
+                    ".png"
+                ].includes(ext);
+            }
+        );
+
         res.json({
             scanId: req.params.id,
-            exists: true
+            files: downloads
         });
     }
 );
+
+
+/*
+    DOWNLOAD
+*/
+
+app.get(
+    "/api/download/:id/:file",
+    (req, res) => {
+
+        const id =
+            req.params.id;
+
+        const file =
+            path.basename(
+                req.params.file
+            );
+
+        const filePath =
+            path.join(
+                SCANS,
+                id,
+                "result",
+                file
+            );
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).send(
+                "Datei wurde noch nicht erstellt."
+            );
+        }
+
+        res.download(
+            filePath,
+            file
+        );
+    }
+);
+
+
+/*
+    SERVER
+*/
 
 app.listen(
     PORT,
@@ -286,21 +272,33 @@ app.listen(
     () => {
 
         console.log("");
-        console.log("=================================");
-        console.log("ULTRA 3D SCANNER");
-        console.log("=================================");
         console.log(
-            `Server läuft auf Port ${PORT}`
+            "=============================="
         );
+
         console.log(
-            "Max. Fotos: 100"
+            "ULTRA 3D SCANNER"
         );
+
         console.log(
-            "Texturziel: 30K"
+            `Port: ${PORT}`
         );
+
         console.log(
-            "Meshziel: 750.000.000 Dreiecke"
+            "Textur: bis 30K"
         );
-        console.log("=================================");
+
+        console.log(
+            "Mesh: bis 750 Mio. Dreiecke"
+        );
+
+        console.log(
+            "Export: GLB / OBJ / STL"
+        );
+
+        console.log(
+            "=============================="
+        );
+
     }
 );
