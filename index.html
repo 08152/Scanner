@@ -1,1104 +1,276 @@
-```html
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
 
-<title>Ultra 3D Scanner</title>
+    <title>3D Fotoscanner</title>
 
-<style>
-* {
-    box-sizing: border-box;
-}
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-html,
-body {
-    margin: 0;
-    padding: 0;
-    min-height: 100%;
-}
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #0b0b0d;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
 
-body {
-    background: #101114;
-    color: #fff;
-    font-family: Arial, Helvetica, sans-serif;
-    padding: 20px;
-}
+        body {
+            display: flex;
+            flex-direction: column;
+        }
 
-.app {
-    width: 100%;
-    max-width: 900px;
-    margin: 0 auto;
-}
+        header {
+            padding: 14px;
+            border-bottom: 1px solid #242428;
+            background: #111114;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            z-index: 10;
+        }
 
-.header {
-    text-align: center;
-    margin-bottom: 24px;
-}
+        header h1 {
+            margin: 0;
+            font-size: 18px;
+        }
 
-.header h1 {
-    margin: 0 0 8px;
-    font-size: clamp(32px, 7vw, 52px);
-}
+        #status {
+            font-size: 13px;
+            opacity: 0.8;
+            text-align: right;
+        }
 
-.header p {
-    margin: 0;
-    color: #aaa;
-    line-height: 1.5;
-}
+        main {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
 
-.card {
-    width: 100%;
-    background: #1a1c21;
-    border: 1px solid #292c33;
-    border-radius: 18px;
-    padding: 20px;
-    margin-bottom: 18px;
-}
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #050507;
+            touch-action: none;
+        }
 
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-}
+        .panel {
+            position: absolute;
+            left: 12px;
+            top: 12px;
+            width: min(390px, calc(100% - 24px));
+            padding: 14px;
+            background: rgba(17, 17, 20, 0.94);
+            border: 1px solid #29292e;
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            z-index: 5;
+        }
 
-.info {
-    background: #23262d;
-    border-radius: 14px;
-    padding: 16px;
-    text-align: center;
-}
+        .drop {
+            border: 2px dashed #404047;
+            border-radius: 14px;
+            padding: 20px 12px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
 
-.info-value {
-    display: block;
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
+        .drop.active {
+            border-color: #fff;
+        }
 
-.info-label {
-    color: #999;
-    font-size: 13px;
-}
+        input[type="file"] {
+            display: none;
+        }
 
-.upload-area {
-    width: 100%;
-    min-height: 230px;
-    border: 2px dashed #555;
-    border-radius: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 25px;
-    cursor: pointer;
-    user-select: none;
-}
+        button,
+        select {
+            width: 100%;
+            min-height: 44px;
+            border: 0;
+            border-radius: 12px;
+            margin-top: 8px;
+            padding: 10px 12px;
+            font-size: 15px;
+            background: #232329;
+            color: white;
+        }
 
-.upload-area:hover,
-.upload-area.drag {
-    background: #202329;
-    border-color: #aaa;
-}
+        button {
+            cursor: pointer;
+        }
 
-.upload-icon {
-    font-size: 54px;
-    margin-bottom: 12px;
-}
+        button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
 
-.upload-title {
-    font-size: 21px;
-    font-weight: bold;
-    margin-bottom: 8px;
-}
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
 
-.upload-description {
-    color: #999;
-    line-height: 1.5;
-}
+        .progress {
+            height: 8px;
+            margin-top: 12px;
+            background: #25252a;
+            border-radius: 999px;
+            overflow: hidden;
+        }
 
-#photos {
-    display: none;
-}
+        #progressBar {
+            width: 0%;
+            height: 100%;
+            background: white;
+            transition: width 0.2s linear;
+        }
 
-.file-count {
-    margin-top: 15px;
-    padding: 13px;
-    background: #23262d;
-    border-radius: 12px;
-    color: #ccc;
-    text-align: center;
-}
+        #progressText {
+            margin-top: 8px;
+            font-size: 13px;
+        }
 
-.main-button {
-    width: 100%;
-    min-height: 60px;
-    margin-top: 15px;
-    border: 0;
-    border-radius: 15px;
-    background: #fff;
-    color: #111;
-    font-size: 18px;
-    font-weight: bold;
-    cursor: pointer;
-}
+        #filesText {
+            margin-top: 8px;
+            font-size: 13px;
+            opacity: 0.75;
+        }
 
-.main-button:disabled {
-    opacity: .35;
-    cursor: not-allowed;
-}
+        #log {
+            margin-top: 12px;
+            height: 130px;
+            overflow: auto;
+            padding: 10px;
+            border-radius: 10px;
+            background: #09090b;
+            color: #bfc0c6;
+            font-family: Consolas, monospace;
+            font-size: 11px;
+            white-space: pre-wrap;
+        }
 
-.status-title {
-    font-size: 21px;
-    font-weight: bold;
-    margin-bottom: 10px;
-}
+        .small {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-top: 8px;
+        }
 
-.status-message {
-    color: #ccc;
-    min-height: 24px;
-    line-height: 1.5;
-}
+        @media (max-width: 600px) {
+            .panel {
+                top: auto;
+                bottom: 12px;
+            }
 
-.progress {
-    width: 100%;
-    height: 14px;
-    margin-top: 18px;
-    background: #30333a;
-    border-radius: 20px;
-    overflow: hidden;
-}
-
-.progress-bar {
-    width: 0%;
-    height: 100%;
-    background: #fff;
-    transition: width .5s;
-}
-
-.viewer-card,
-.download-card {
-    display: none;
-}
-
-.viewer-title {
-    margin: 0 0 15px;
-}
-
-.viewer {
-    width: 100%;
-    height: 520px;
-    background: #08090b;
-    border-radius: 16px;
-    overflow: hidden;
-}
-
-model-viewer {
-    width: 100%;
-    height: 100%;
-    background: #08090b;
-}
-
-.viewer-help {
-    text-align: center;
-    color: #888;
-    margin-top: 12px;
-    line-height: 1.5;
-}
-
-.download-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.download-button {
-    width: 100%;
-    min-height: 58px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #fff;
-    color: #111;
-    border-radius: 14px;
-    text-decoration: none;
-    font-weight: bold;
-    padding: 15px;
-    text-align: center;
-    overflow-wrap: anywhere;
-}
-
-.error {
-    color: #ff7777;
-}
-
-.success {
-    color: #80e890;
-}
-
-.scan-id {
-    margin-top: 10px;
-    color: #777;
-    font-size: 12px;
-    word-break: break-all;
-}
-
-@media (max-width: 650px) {
-    body {
-        padding: 10px;
-    }
-
-    .card {
-        padding: 15px;
-    }
-
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .viewer {
-        height: 420px;
-    }
-}
-
-@media (max-width: 420px) {
-    .viewer {
-        height: 330px;
-    }
-
-    .upload-area {
-        min-height: 200px;
-    }
-}
-</style>
+            #log {
+                height: 100px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<div class="app">
-
-<header class="header">
-    <h1>Ultra 3D Scanner</h1>
-    <p>
-        Fotos hochladen und daraus ein echtes
-        3D-Modell berechnen.
-    </p>
+<header>
+    <h1>3D Fotoscanner</h1>
+    <div id="status">Bereit</div>
 </header>
 
+<main>
+    <canvas id="canvas"></canvas>
 
-<section class="card">
+    <section class="panel">
 
-    <div class="info-grid">
+        <label
+            class="drop"
+            id="dropZone"
+            for="photos"
+        >
+            Fotos auswählen<br>
+            <span class="small">
+                20–200 überlappende Bilder
+            </span>
+        </label>
 
-        <div class="info">
-            <span class="info-value">100</span>
-            <span class="info-label">Fotos maximal</span>
+        <input
+            id="photos"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+        >
+
+        <div id="filesText">
+            Keine Bilder ausgewählt
         </div>
 
-        <div class="info">
-            <span class="info-value">30K</span>
-            <span class="info-label">Textur-Ziel</span>
+        <select id="quality">
+            <option value="draft">Draft</option>
+            <option value="showcase" selected>Showcase</option>
+            <option value="ultra">Ultra</option>
+        </select>
+
+        <div class="row">
+            <button id="startButton">
+                Scan starten
+            </button>
+
+            <button
+                id="pauseButton"
+                disabled
+            >
+                Pause
+            </button>
         </div>
 
-        <div class="info">
-            <span class="info-value">750M</span>
-            <span class="info-label">Dreiecks-Ziel</span>
+        <button
+            id="finishButton"
+            disabled
+        >
+            Jetzt beenden & exportieren
+        </button>
+
+        <button
+            id="downloadButton"
+            disabled
+        >
+            PLY herunterladen
+        </button>
+
+        <div class="progress">
+            <div id="progressBar"></div>
         </div>
 
-    </div>
-
-</section>
-
-
-<section class="card">
-
-    <label
-        class="upload-area"
-        id="uploadArea"
-        for="photos"
-    >
-
-        <div class="upload-icon">📷</div>
-
-        <div class="upload-title">
-            Fotos auswählen
+        <div id="progressText">
+            0%
         </div>
 
-        <div class="upload-description">
-            50–100 Fotos empfohlen.
-            <br>
-            JPG, PNG oder WebP.
-            <br>
-            Dateien können auch hierher gezogen werden.
+        <div id="log"></div>
+
+        <div class="small">
+            Die Verarbeitung läuft im Browser.
         </div>
 
-    </label>
-
-    <input
-        id="photos"
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        multiple
-    >
-
-    <div
-        class="file-count"
-        id="fileCount"
-    >
-        Noch keine Fotos ausgewählt.
-    </div>
-
-    <button
-        class="main-button"
-        id="createButton"
-        disabled
-    >
-        3D-MODELL ERSTELLEN
-    </button>
-
-</section>
-
-
-<section class="card">
-
-    <div class="status-title">
-        Status
-    </div>
-
-    <div
-        class="status-message"
-        id="statusMessage"
-    >
-        Bereit.
-    </div>
-
-    <div class="progress">
-
-        <div
-            class="progress-bar"
-            id="progressBar"
-        ></div>
-
-    </div>
-
-    <div
-        class="scan-id"
-        id="scanId"
-    ></div>
-
-</section>
-
-
-<section
-    class="card viewer-card"
-    id="viewerCard"
->
-
-    <h2 class="viewer-title">
-        3D-Vorschau
-    </h2>
-
-    <div class="viewer">
-
-        <model-viewer
-            id="modelViewer"
-            camera-controls
-            touch-action="pan-y"
-            auto-rotate
-            shadow-intensity="1"
-            exposure="1"
-        ></model-viewer>
-
-    </div>
-
-    <div class="viewer-help">
-        Finger bewegen: Modell drehen
-        <br>
-        Zwei Finger: zoomen
-    </div>
-
-</section>
-
-
-<section
-    class="card download-card"
-    id="downloadCard"
->
-
-    <h2>
-        Modell herunterladen
-    </h2>
-
-    <div
-        class="download-list"
-        id="downloadList"
-    ></div>
-
-</section>
-
-</div>
-
+    </section>
+</main>
 
 <script
     type="module"
-    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
+    src="./app.js"
 ></script>
-
-
-<script>
-
-const photos =
-    document.getElementById("photos");
-
-const uploadArea =
-    document.getElementById("uploadArea");
-
-const fileCount =
-    document.getElementById("fileCount");
-
-const createButton =
-    document.getElementById("createButton");
-
-const statusMessage =
-    document.getElementById("statusMessage");
-
-const progressBar =
-    document.getElementById("progressBar");
-
-const viewerCard =
-    document.getElementById("viewerCard");
-
-const modelViewer =
-    document.getElementById("modelViewer");
-
-const downloadCard =
-    document.getElementById("downloadCard");
-
-const downloadList =
-    document.getElementById("downloadList");
-
-const scanIdElement =
-    document.getElementById("scanId");
-
-
-let selectedFiles = [];
-
-let currentScanId = null;
-
-
-/* =========================================================
-   BILDER
-========================================================= */
-
-function isImage(file) {
-
-    return [
-        "image/jpeg",
-        "image/png",
-        "image/webp"
-    ].includes(file.type);
-}
-
-
-photos.addEventListener(
-    "change",
-    () => {
-
-        selectedFiles =
-            Array.from(
-                photos.files
-            )
-            .filter(isImage)
-            .slice(0, 100);
-
-        updateFileCount();
-    }
-);
-
-
-/* =========================================================
-   DRAG & DROP
-========================================================= */
-
-uploadArea.addEventListener(
-    "dragover",
-    event => {
-
-        event.preventDefault();
-
-        uploadArea.classList.add(
-            "drag"
-        );
-    }
-);
-
-
-uploadArea.addEventListener(
-    "dragleave",
-    () => {
-
-        uploadArea.classList.remove(
-            "drag"
-        );
-    }
-);
-
-
-uploadArea.addEventListener(
-    "drop",
-    event => {
-
-        event.preventDefault();
-
-        uploadArea.classList.remove(
-            "drag"
-        );
-
-        selectedFiles =
-            Array.from(
-                event.dataTransfer.files
-            )
-            .filter(isImage)
-            .slice(0, 100);
-
-        updateFileCount();
-    }
-);
-
-
-/* =========================================================
-   DATEIANZAHL
-========================================================= */
-
-function updateFileCount() {
-
-    const count =
-        selectedFiles.length;
-
-    if (count === 0) {
-
-        fileCount.textContent =
-            "Noch keine Fotos ausgewählt.";
-
-        createButton.disabled =
-            true;
-
-        return;
-    }
-
-    fileCount.textContent =
-        `${count} Foto${count === 1 ? "" : "s"} ausgewählt.`;
-
-    createButton.disabled =
-        count < 3;
-}
-
-
-/* =========================================================
-   SCAN STARTEN
-========================================================= */
-
-createButton.addEventListener(
-    "click",
-    startScan
-);
-
-
-async function startScan() {
-
-    if (
-        selectedFiles.length < 3
-    ) {
-
-        setError(
-            "Bitte mindestens 3 Fotos auswählen."
-        );
-
-        return;
-    }
-
-
-    createButton.disabled =
-        true;
-
-
-    viewerCard.style.display =
-        "none";
-
-
-    downloadCard.style.display =
-        "none";
-
-
-    downloadList.innerHTML =
-        "";
-
-
-    scanIdElement.textContent =
-        "";
-
-
-    setProgress(5);
-
-    setStatus(
-        "Fotos werden hochgeladen..."
-    );
-
-
-    const formData =
-        new FormData();
-
-
-    for (
-        const file of selectedFiles
-    ) {
-
-        formData.append(
-            "photos",
-            file
-        );
-    }
-
-
-    try {
-
-        /*
-         * WICHTIG:
-         * Der Server verwendet /api/upload.
-         */
-
-        const response =
-            await fetch(
-                "/api/upload",
-                {
-                    method: "POST",
-                    body: formData
-                }
-            );
-
-
-        const text =
-            await response.text();
-
-
-        let data;
-
-
-        try {
-
-            data =
-                JSON.parse(text);
-
-        } catch {
-
-            throw new Error(
-                `Server antwortete mit HTTP ${response.status}.`
-            );
-        }
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                data.error ||
-                "Upload fehlgeschlagen."
-            );
-        }
-
-
-        if (
-            !data.scanId
-        ) {
-
-            throw new Error(
-                "Der Server hat keine Scan-ID zurückgegeben."
-            );
-        }
-
-
-        currentScanId =
-            data.scanId;
-
-
-        scanIdElement.textContent =
-            "Scan-ID: " +
-            currentScanId;
-
-
-        setProgress(10);
-
-
-        setStatus(
-            `Upload fertig. ${data.photos} Fotos werden verarbeitet...`
-        );
-
-
-        pollStatus();
-
-
-    } catch (
-        error
-    ) {
-
-        console.error(
-            error
-        );
-
-
-        setError(
-            error.message
-        );
-
-
-        createButton.disabled =
-            false;
-    }
-}
-
-
-/* =========================================================
-   STATUS ABFRAGEN
-========================================================= */
-
-async function pollStatus() {
-
-    if (
-        !currentScanId
-    ) {
-
-        return;
-    }
-
-
-    try {
-
-        const response =
-            await fetch(
-                `/api/status/${encodeURIComponent(currentScanId)}`
-            );
-
-
-        const text =
-            await response.text();
-
-
-        let data;
-
-
-        try {
-
-            data =
-                JSON.parse(text);
-
-        } catch {
-
-            throw new Error(
-                `Status-Server antwortete mit HTTP ${response.status}.`
-            );
-        }
-
-
-        if (
-            !response.ok
-        ) {
-
-            throw new Error(
-                data.error ||
-                "Status konnte nicht gelesen werden."
-            );
-        }
-
-
-        /*
-         * SERVER:
-         *
-         * state
-         * step
-         * progress
-         */
-
-        setStatus(
-            data.step ||
-            "Berechnung läuft..."
-        );
-
-
-        setProgress(
-            data.progress || 0
-        );
-
-
-        if (
-            data.state ===
-            "finished"
-        ) {
-
-            showFinished(
-                data
-            );
-
-            return;
-        }
-
-
-        if (
-            data.state ===
-            "error"
-        ) {
-
-            setError(
-                data.error ||
-                "Die 3D-Berechnung ist fehlgeschlagen."
-            );
-
-            createButton.disabled =
-                false;
-
-            return;
-        }
-
-
-        setTimeout(
-            pollStatus,
-            3000
-        );
-
-
-    } catch (
-        error
-    ) {
-
-        console.error(
-            error
-        );
-
-
-        setError(
-            error.message
-        );
-
-
-        setTimeout(
-            pollStatus,
-            5000
-        );
-    }
-}
-
-
-/* =========================================================
-   FERTIG
-========================================================= */
-
-function showFinished(
-    data
-) {
-
-    setProgress(
-        100
-    );
-
-
-    setSuccess(
-        "✅ 3D-Modell ist fertig!"
-    );
-
-
-    const files =
-        Array.isArray(
-            data.files
-        )
-            ? data.files
-            : [];
-
-
-    const model =
-        data.model ||
-        files.find(
-            file =>
-                file
-                    .toLowerCase()
-                    .endsWith(
-                        ".glb"
-                    )
-        );
-
-
-    if (
-        model
-    ) {
-
-        const modelPath =
-            model
-                .split("/")
-                .map(
-                    part =>
-                        encodeURIComponent(
-                            part
-                        )
-                )
-                .join("/");
-
-
-        const modelUrl =
-            `/api/download/` +
-            `${encodeURIComponent(currentScanId)}/` +
-            modelPath;
-
-
-        console.log(
-            "MODELL:",
-            modelUrl
-        );
-
-
-        modelViewer.src =
-            modelUrl;
-
-
-        viewerCard.style.display =
-            "block";
-    }
-
-
-    downloadList.innerHTML =
-        "";
-
-
-    for (
-        const file of files
-    ) {
-
-        const button =
-            document.createElement(
-                "a"
-            );
-
-
-        const filePath =
-            file
-                .split("/")
-                .map(
-                    part =>
-                        encodeURIComponent(
-                            part
-                        )
-                )
-                .join("/");
-
-
-        button.className =
-            "download-button";
-
-
-        button.href =
-            `/api/download/` +
-            `${encodeURIComponent(currentScanId)}/` +
-            filePath;
-
-
-        button.download =
-            file
-                .split("/")
-                .pop();
-
-
-        button.textContent =
-            "⬇️ " +
-            file
-                .split("/")
-                .pop();
-
-
-        downloadList.appendChild(
-            button
-        );
-    }
-
-
-    if (
-        files.length > 0
-    ) {
-
-        downloadCard.style.display =
-            "block";
-    }
-
-
-    createButton.disabled =
-        false;
-}
-
-
-/* =========================================================
-   UI
-========================================================= */
-
-function setStatus(
-    message
-) {
-
-    statusMessage.className =
-        "status-message";
-
-    statusMessage.textContent =
-        message;
-}
-
-
-function setError(
-    message
-) {
-
-    statusMessage.className =
-        "status-message error";
-
-    statusMessage.textContent =
-        "❌ " +
-        message;
-}
-
-
-function setSuccess(
-    message
-) {
-
-    statusMessage.className =
-        "status-message success";
-
-    statusMessage.textContent =
-        message;
-}
-
-
-function setProgress(
-    value
-) {
-
-    value =
-        Number(value) || 0;
-
-
-    value =
-        Math.max(
-            0,
-            Math.min(
-                100,
-                value
-            )
-        );
-
-
-    progressBar.style.width =
-        `${value}%`;
-}
-
-</script>
 
 </body>
 </html>
-```
