@@ -9,13 +9,12 @@ const { spawn } = require("child_process");
 const app = express();
 
 const PORT = process.env.PORT || 10000;
-const ROOT = __dirname;
-const SCANS_DIR = path.join(ROOT, "scans");
+const SCANS_DIR = path.join(__dirname, "scans");
 
 fs.mkdirSync(SCANS_DIR, { recursive: true });
 
 app.use(express.json());
-app.use(express.static(ROOT));
+app.use(express.static(__dirname));
 
 /* =========================================
    ALICEVISION
@@ -35,16 +34,38 @@ const AV = {
 };
 
 /* =========================================
+   FIND ALICEVISION
+========================================= */
+
+function findProgram(name) {
+    const locations = [
+        "/usr/local/bin/" + name,
+        "/usr/bin/" + name,
+        "/usr/local/AliceVision/bin/" + name,
+        "/opt/AliceVision/bin/" + name
+    ];
+
+    for (const location of locations) {
+        if (fs.existsSync(location)) {
+            return location;
+        }
+    }
+
+    return name;
+}
+
+/* =========================================
    UPLOAD
 ========================================= */
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
+    destination: function (req, file, cb) {
         cb(null, req.scanImagesDir);
     },
 
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
+    filename: function (req, file, cb) {
+        const ext =
+            path.extname(file.originalname).toLowerCase();
 
         const filename =
             Date.now() +
@@ -57,14 +78,14 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-    storage,
+    storage: storage,
 
     limits: {
         files: 100,
         fileSize: 100 * 1024 * 1024
     },
 
-    fileFilter: (req, file, cb) => {
+    fileFilter: function (req, file, cb) {
         const allowed = [
             ".jpg",
             ".jpeg",
@@ -88,7 +109,7 @@ const upload = multer({
 });
 
 /* =========================================
-   HILFSFUNKTIONEN
+   JSON
 ========================================= */
 
 function writeJSON(file, data) {
@@ -98,7 +119,7 @@ function writeJSON(file, data) {
     );
 }
 
-function readJSON(file, fallback = {}) {
+function readJSON(file, fallback) {
     try {
         return JSON.parse(
             fs.readFileSync(file, "utf8")
@@ -108,7 +129,7 @@ function readJSON(file, fallback = {}) {
     }
 }
 
-function statusFile(id) {
+function getStatusFile(id) {
     return path.join(
         SCANS_DIR,
         id,
@@ -117,37 +138,35 @@ function statusFile(id) {
 }
 
 function updateStatus(id, data) {
-    const file = statusFile(id);
+    const file = getStatusFile(id);
 
-    const old =
-        readJSON(file, {});
+    const old = readJSON(file, {});
 
     writeJSON(file, {
         ...old,
         ...data,
-        updated:
-            new Date().toISOString()
+        updated: new Date().toISOString()
     });
 }
 
 /* =========================================
-   PROGRAMM AUSFÜHREN
+   PROGRAMM STARTEN
 ========================================= */
 
 function run(command, args, cwd) {
-    return new Promise((resolve, reject) => {
+    return new Promise(function (resolve, reject) {
 
         console.log("");
-        console.log("=================================");
+        console.log("========================================");
         console.log("START:", command);
         console.log("ARGS:", args.join(" "));
-        console.log("=================================");
+        console.log("========================================");
 
         const child = spawn(
             command,
             args,
             {
-                cwd,
+                cwd: cwd,
                 env: process.env,
                 stdio: [
                     "ignore",
@@ -157,59 +176,43 @@ function run(command, args, cwd) {
             }
         );
 
-        child.stdout.on(
-            "data",
-            data => {
-                console.log(
-                    data.toString()
+        child.stdout.on("data", function (data) {
+            console.log(data.toString());
+        });
+
+        child.stderr.on("data", function (data) {
+            console.error(data.toString());
+        });
+
+        child.on("error", function (error) {
+            console.error(
+                "PROGRAMMFEHLER:",
+                error
+            );
+
+            reject(error);
+        });
+
+        child.on("close", function (code) {
+
+            console.log(
+                command +
+                " beendet mit Code " +
+                code
+            );
+
+            if (code === 0) {
+                resolve();
+            } else {
+                reject(
+                    new Error(
+                        command +
+                        " beendet mit Fehlercode " +
+                        code
+                    )
                 );
             }
-        );
-
-        child.stderr.on(
-            "data",
-            data => {
-                console.error(
-                    data.toString()
-                );
-            }
-        );
-
-        child.on(
-            "error",
-            error => {
-                console.error(
-                    "PROCESS ERROR:",
-                    error
-                );
-
-                reject(error);
-            }
-        );
-
-        child.on(
-            "close",
-            code => {
-
-                console.log(
-                    command +
-                    " beendet mit Code " +
-                    code
-                );
-
-                if (code === 0) {
-                    resolve();
-                } else {
-                    reject(
-                        new Error(
-                            command +
-                            " beendet mit Fehlercode " +
-                            code
-                        )
-                    );
-                }
-            }
-        );
+        });
     });
 }
 
@@ -225,11 +228,11 @@ function findFiles(directory) {
 
     const result = [];
 
-    function scan(dir) {
+    function scan(current) {
 
         const entries =
             fs.readdirSync(
-                dir,
+                current,
                 {
                     withFileTypes: true
                 }
@@ -237,19 +240,19 @@ function findFiles(directory) {
 
         for (const entry of entries) {
 
-            const full =
+            const fullPath =
                 path.join(
-                    dir,
+                    current,
                     entry.name
                 );
 
             if (entry.isDirectory()) {
-                scan(full);
+                scan(fullPath);
             } else {
                 result.push(
                     path.relative(
                         directory,
-                        full
+                        fullPath
                     )
                 );
             }
@@ -262,7 +265,7 @@ function findFiles(directory) {
 }
 
 /* =========================================
-   3D-MODELL ERSTELLEN
+   3D-SCAN
 ========================================= */
 
 async function createModel(id) {
@@ -323,7 +326,7 @@ async function createModel(id) {
 
     try {
 
-        /* 1. Kamera */
+        /* 1 */
 
         updateStatus(id, {
             state: "processing",
@@ -336,11 +339,10 @@ async function createModel(id) {
         });
 
         await run(
-            AV.cameraInit,
+            findProgram(AV.cameraInit),
             [
                 "--imageFolder",
                 images,
-
                 "--output",
                 path.join(
                     camera,
@@ -350,7 +352,7 @@ async function createModel(id) {
             scanDir
         );
 
-        /* 2. Features */
+        /* 2 */
 
         updateStatus(id, {
             step: "Bildmerkmale analysieren",
@@ -362,24 +364,24 @@ async function createModel(id) {
         });
 
         await run(
-            AV.featureExtraction,
+            findProgram(
+                AV.featureExtraction
+            ),
             [
                 "--input",
                 path.join(
                     camera,
                     "cameras.sfm"
                 ),
-
                 "--output",
                 features,
-
                 "--describerTypes",
                 "sift"
             ],
             scanDir
         );
 
-        /* 3. Bildvergleich */
+        /* 3 */
 
         updateStatus(id, {
             step: "Fotos vergleichen",
@@ -391,17 +393,17 @@ async function createModel(id) {
         });
 
         await run(
-            AV.imageMatching,
+            findProgram(
+                AV.imageMatching
+            ),
             [
                 "--input",
                 path.join(
                     camera,
                     "cameras.sfm"
                 ),
-
                 "--featuresFolders",
                 features,
-
                 "--output",
                 path.join(
                     matches,
@@ -412,30 +414,29 @@ async function createModel(id) {
         );
 
         await run(
-            AV.featureMatching,
+            findProgram(
+                AV.featureMatching
+            ),
             [
                 "--input",
                 path.join(
                     camera,
                     "cameras.sfm"
                 ),
-
                 "--featuresFolders",
                 features,
-
                 "--imagePairsList",
                 path.join(
                     matches,
                     "imageMatches.txt"
                 ),
-
                 "--output",
                 matches
             ],
             scanDir
         );
 
-        /* 4. 3D-Kameras */
+        /* 4 */
 
         updateStatus(id, {
             step: "3D-Kamera-Positionen berechnen",
@@ -447,26 +448,22 @@ async function createModel(id) {
         });
 
         await run(
-            AV.sfm,
+            findProgram(AV.sfm),
             [
                 "--input",
                 path.join(
                     camera,
                     "cameras.sfm"
                 ),
-
                 "--featuresFolders",
                 features,
-
                 "--matchesFolders",
                 matches,
-
                 "--output",
                 path.join(
                     sfm,
                     "sfm.abc"
                 ),
-
                 "--outputViewsAndPoses",
                 path.join(
                     sfm,
@@ -476,7 +473,7 @@ async function createModel(id) {
             scanDir
         );
 
-        /* 5. Tiefenkarte */
+        /* 5 */
 
         updateStatus(id, {
             step: "Tiefeninformationen berechnen",
@@ -488,24 +485,24 @@ async function createModel(id) {
         });
 
         await run(
-            AV.depthMap,
+            findProgram(
+                AV.depthMap
+            ),
             [
                 "--input",
                 path.join(
                     sfm,
                     "sfm.abc"
                 ),
-
                 "--output",
                 depth,
-
                 "--downscale",
                 "2"
             ],
             scanDir
         );
 
-        /* 6. Tiefenfilter */
+        /* 6 */
 
         updateStatus(id, {
             step: "Tiefeninformationen filtern",
@@ -513,24 +510,24 @@ async function createModel(id) {
         });
 
         await run(
-            AV.depthMapFilter,
+            findProgram(
+                AV.depthMapFilter
+            ),
             [
                 "--input",
                 path.join(
                     sfm,
                     "sfm.abc"
                 ),
-
                 "--depthMapFolder",
                 depth,
-
                 "--output",
                 depth
             ],
             scanDir
         );
 
-        /* 7. Mesh */
+        /* 7 */
 
         updateStatus(id, {
             step: "3D-Netz erstellen",
@@ -542,17 +539,17 @@ async function createModel(id) {
         });
 
         await run(
-            AV.meshing,
+            findProgram(
+                AV.meshing
+            ),
             [
                 "--input",
                 path.join(
                     sfm,
                     "sfm.abc"
                 ),
-
                 "--depthMapFolder",
                 depth,
-
                 "--output",
                 path.join(
                     mesh,
@@ -562,7 +559,7 @@ async function createModel(id) {
             scanDir
         );
 
-        /* 8. Mesh verbessern */
+        /* 8 */
 
         updateStatus(id, {
             step: "3D-Modell verbessern",
@@ -570,14 +567,15 @@ async function createModel(id) {
         });
 
         await run(
-            AV.meshFiltering,
+            findProgram(
+                AV.meshFiltering
+            ),
             [
                 "--input",
                 path.join(
                     mesh,
                     "mesh.obj"
                 ),
-
                 "--output",
                 path.join(
                     mesh,
@@ -587,7 +585,7 @@ async function createModel(id) {
             scanDir
         );
 
-        /* 9. Textur */
+        /* 9 */
 
         updateStatus(id, {
             step: "Fototextur erstellen",
@@ -599,57 +597,70 @@ async function createModel(id) {
         });
 
         await run(
-            AV.texturing,
+            findProgram(
+                AV.texturing
+            ),
             [
                 "--input",
                 path.join(
                     sfm,
                     "sfm.abc"
                 ),
-
                 "--inputMesh",
                 path.join(
                     mesh,
                     "filtered.obj"
                 ),
-
                 "--output",
                 texture,
-
                 "--textureSide",
                 "8192"
             ],
             scanDir
         );
 
-        /* Fertig */
-
         const files =
             findFiles(scanDir)
-            .filter(
-                file =>
-                    !file.startsWith(
-                        "images/"
-                    )
-            );
+            .filter(function (file) {
+                return !file.startsWith(
+                    "images/"
+                );
+            });
 
         updateStatus(id, {
             state: "finished",
             step: "Fertig",
             progress: 100,
-            files
+            files: files
         });
+
+        console.log(
+            "========================================"
+        );
 
         console.log(
             "3D-SCAN FERTIG:",
             id
         );
 
+        console.log(
+            "========================================"
+        );
+
     } catch (error) {
 
         console.error(
-            "3D-SCAN FEHLER:",
-            error
+            "========================================"
+        );
+
+        console.error(
+            "3D-SCAN FEHLER:"
+        );
+
+        console.error(error);
+
+        console.error(
+            "========================================"
         );
 
         updateStatus(id, {
@@ -669,7 +680,7 @@ async function createModel(id) {
 
 app.post(
     "/api/upload",
-    (req, res, next) => {
+    function (req, res, next) {
 
         const id =
             crypto
@@ -704,7 +715,7 @@ app.post(
         )(
             req,
             res,
-            error => {
+            function (error) {
 
                 if (error) {
                     return next(error);
@@ -773,10 +784,10 @@ app.post(
 
 app.get(
     "/api/status/:id",
-    (req, res) => {
+    function (req, res) {
 
         const file =
-            statusFile(
+            getStatusFile(
                 req.params.id
             );
 
@@ -791,7 +802,7 @@ app.get(
         }
 
         res.json(
-            readJSON(file)
+            readJSON(file, {})
         );
     }
 );
@@ -802,7 +813,7 @@ app.get(
 
 app.get(
     "/api/download/:id/{*file}",
-    (req, res) => {
+    function (req, res) {
 
         const id =
             req.params.id;
@@ -861,19 +872,23 @@ app.get(
 
 app.get(
     "/api/health",
-    (req, res) => {
+    function (req, res) {
 
         const binaries = {};
 
         for (
-            const [name, command]
-            of Object.entries(AV)
+            const name of Object.keys(AV)
         ) {
 
+            const program =
+                findProgram(
+                    AV[name]
+                );
+
             binaries[name] = {
-                command,
-                available:
-                    commandAvailable(command)
+                command: program,
+                exists:
+                    fs.existsSync(program)
             };
         }
 
@@ -885,27 +900,12 @@ app.get(
     }
 );
 
-function commandAvailable(command) {
-
-    const locations = [
-        `/usr/local/bin/${command}`,
-        `/usr/bin/${command}`,
-        `/usr/local/AliceVision/bin/${command}`,
-        `/opt/AliceVision/bin/${command}`
-    ];
-
-    return locations.some(
-        file =>
-            fs.existsSync(file)
-    );
-}
-
 /* =========================================
    FEHLER
 ========================================= */
 
 app.use(
-    (error, req, res, next) => {
+    function (error, req, res, next) {
 
         console.error(
             "SERVER FEHLER:",
@@ -921,32 +921,37 @@ app.use(
 );
 
 /* =========================================
-   SERVER START
+   START
 ========================================= */
 
 app.listen(
     PORT,
     "0.0.0.0",
-    () => {
+    function () {
 
         console.log("");
         console.log(
             "========================================"
         );
+
         console.log(
             "       ALICEVISION 3D SCANNER"
         );
+
         console.log(
             "========================================"
         );
+
         console.log(
             "Port:",
             PORT
         );
+
         console.log(
             "Node:",
             process.version
         );
+
         console.log(
             "========================================"
         );
