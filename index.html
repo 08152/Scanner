@@ -1,1022 +1,870 @@
-const express = require("express");
-const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
-const crypto = require("crypto");
-const { spawn } = require("child_process");
+```html
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-const app = express();
+<title>Ultra 3D Scanner</title>
 
+<style>
+* {
+    box-sizing: border-box;
+}
 
-// ============================================================
-// KONFIGURATION
-// ============================================================
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+}
 
-const PORT =
-    process.env.PORT || 10000;
+body {
+    background: #101114;
+    color: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    padding: 20px;
+}
 
-const ROOT =
-    __dirname;
+.app {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
 
-const SCANS_DIR =
-    path.join(
-        ROOT,
-        "scans"
-    );
+.header {
+    text-align: center;
+    margin-bottom: 24px;
+}
 
+.header h1 {
+    margin: 0 0 8px;
+    font-size: clamp(32px, 7vw, 52px);
+}
 
-// ============================================================
-// PROGRAMME
-// ============================================================
+.header p {
+    margin: 0;
+    color: #aaa;
+    line-height: 1.5;
+}
 
-const COLMAP =
-    process.env.COLMAP_PATH ||
-    "/usr/local/bin/colmap";
+.card {
+    width: 100%;
+    background: #1a1c21;
+    border: 1px solid #292c33;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 18px;
+}
 
-const ASSIMP =
-    process.env.ASSIMP_PATH ||
-    "/usr/bin/assimp";
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
 
+.info {
+    background: #23262d;
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+}
 
-// ============================================================
-// ORDNER
-// ============================================================
+.info-value {
+    display: block;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
 
-fs.mkdirSync(
-    SCANS_DIR,
-    {
-        recursive: true
+.info-label {
+    color: #999;
+    font-size: 13px;
+}
+
+.upload-area {
+    width: 100%;
+    min-height: 230px;
+    border: 2px dashed #555;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 25px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.upload-area:hover,
+.upload-area.drag {
+    background: #202329;
+    border-color: #aaa;
+}
+
+.upload-icon {
+    font-size: 54px;
+    margin-bottom: 12px;
+}
+
+.upload-title {
+    font-size: 21px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.upload-description {
+    color: #999;
+    line-height: 1.5;
+}
+
+#photos {
+    display: none;
+}
+
+.file-count {
+    margin-top: 15px;
+    padding: 13px;
+    background: #23262d;
+    border-radius: 12px;
+    color: #ccc;
+    text-align: center;
+}
+
+.main-button {
+    width: 100%;
+    min-height: 60px;
+    margin-top: 15px;
+    border: 0;
+    border-radius: 15px;
+    background: #fff;
+    color: #111;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.main-button:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+.status-title {
+    font-size: 21px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.status-message {
+    color: #ccc;
+    min-height: 24px;
+    line-height: 1.5;
+}
+
+.progress {
+    width: 100%;
+    height: 14px;
+    margin-top: 18px;
+    background: #30333a;
+    border-radius: 20px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    width: 0%;
+    height: 100%;
+    background: #fff;
+    transition: width .5s;
+}
+
+.viewer-card,
+.download-card {
+    display: none;
+}
+
+.viewer-title {
+    margin: 0 0 15px;
+}
+
+.viewer {
+    width: 100%;
+    height: 520px;
+    background: #08090b;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+model-viewer {
+    width: 100%;
+    height: 100%;
+    background: #08090b;
+}
+
+.viewer-help {
+    text-align: center;
+    color: #888;
+    margin-top: 12px;
+    line-height: 1.5;
+}
+
+.download-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.download-button {
+    width: 100%;
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #111;
+    border-radius: 14px;
+    text-decoration: none;
+    font-weight: bold;
+    padding: 15px;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.error {
+    color: #ff7777;
+}
+
+.success {
+    color: #80e890;
+}
+
+.scan-id {
+    margin-top: 10px;
+    color: #777;
+    font-size: 12px;
+    word-break: break-all;
+}
+
+@media (max-width: 650px) {
+    body {
+        padding: 10px;
     }
-);
+
+    .card {
+        padding: 15px;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .viewer {
+        height: 420px;
+    }
+}
+
+@media (max-width: 420px) {
+    .viewer {
+        height: 330px;
+    }
+
+    .upload-area {
+        min-height: 200px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<header class="header">
+    <h1>Ultra 3D Scanner</h1>
+    <p>
+        Fotos hochladen und daraus ein echtes
+        3D-Modell berechnen.
+    </p>
+</header>
 
 
-// ============================================================
-// EXPRESS
-// ============================================================
+<section class="card">
 
-app.use(
-    express.json()
-);
+    <div class="info-grid">
 
-app.use(
-    express.static(ROOT)
-);
+        <div class="info">
+            <span class="info-value">100</span>
+            <span class="info-label">Fotos maximal</span>
+        </div>
 
+        <div class="info">
+            <span class="info-value">30K</span>
+            <span class="info-label">Textur-Ziel</span>
+        </div>
 
-// ============================================================
-// MULTER
-// ============================================================
+        <div class="info">
+            <span class="info-value">750M</span>
+            <span class="info-label">Dreiecks-Ziel</span>
+        </div>
 
-const storage =
-    multer.diskStorage({
+    </div>
 
-        destination:
-            (req, file, cb) => {
-
-                cb(
-                    null,
-                    req.scanImagesDir
-                );
-            },
-
-        filename:
-            (req, file, cb) => {
-
-                const extension =
-                    path
-                        .extname(
-                            file.originalname
-                        )
-                        .toLowerCase();
-
-                const filename =
-                    Date.now() +
-                    "-" +
-                    crypto
-                        .randomBytes(5)
-                        .toString("hex") +
-                    extension;
-
-                cb(
-                    null,
-                    filename
-                );
-            }
-    });
+</section>
 
 
-const upload =
-    multer({
+<section class="card">
 
-        storage,
+    <label
+        class="upload-area"
+        id="uploadArea"
+        for="photos"
+    >
 
-        limits: {
+        <div class="upload-icon">📷</div>
 
-            files: 100,
+        <div class="upload-title">
+            Fotos auswählen
+        </div>
 
-            fileSize:
-                100 *
-                1024 *
-                1024
-        },
+        <div class="upload-description">
+            50–100 Fotos empfohlen.
+            <br>
+            JPG, PNG oder WebP.
+            <br>
+            Dateien können auch hierher gezogen werden.
+        </div>
 
-        fileFilter:
-            (req, file, cb) => {
+    </label>
 
-                const allowed = [
-                    ".jpg",
-                    ".jpeg",
-                    ".png",
-                    ".webp"
-                ];
+    <input
+        id="photos"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple
+    >
 
-                const extension =
-                    path
-                        .extname(
-                            file.originalname
-                        )
-                        .toLowerCase();
+    <div
+        class="file-count"
+        id="fileCount"
+    >
+        Noch keine Fotos ausgewählt.
+    </div>
 
-                if (
-                    !allowed.includes(
-                        extension
-                    )
-                ) {
+    <button
+        class="main-button"
+        id="createButton"
+        disabled
+    >
+        3D-MODELL ERSTELLEN
+    </button>
 
-                    return cb(
-                        new Error(
-                            "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
-                        )
-                    );
-                }
-
-                cb(
-                    null,
-                    true
-                );
-            }
-    });
+</section>
 
 
-// ============================================================
-// JSON
-// ============================================================
+<section class="card">
 
-function writeJSON(
-    file,
-    data
-) {
+    <div class="status-title">
+        Status
+    </div>
 
-    fs.writeFileSync(
-        file,
-        JSON.stringify(
-            data,
-            null,
-            2
-        )
-    );
+    <div
+        class="status-message"
+        id="statusMessage"
+    >
+        Bereit.
+    </div>
+
+    <div class="progress">
+
+        <div
+            class="progress-bar"
+            id="progressBar"
+        ></div>
+
+    </div>
+
+    <div
+        class="scan-id"
+        id="scanId"
+    ></div>
+
+</section>
+
+
+<section
+    class="card viewer-card"
+    id="viewerCard"
+>
+
+    <h2 class="viewer-title">
+        3D-Vorschau
+    </h2>
+
+    <div class="viewer">
+
+        <model-viewer
+            id="modelViewer"
+            camera-controls
+            touch-action="pan-y"
+            auto-rotate
+            shadow-intensity="1"
+            exposure="1"
+        ></model-viewer>
+
+    </div>
+
+    <div class="viewer-help">
+        Finger bewegen: Modell drehen
+        <br>
+        Zwei Finger: zoomen
+    </div>
+
+</section>
+
+
+<section
+    class="card download-card"
+    id="downloadCard"
+>
+
+    <h2>
+        Modell herunterladen
+    </h2>
+
+    <div
+        class="download-list"
+        id="downloadList"
+    ></div>
+
+</section>
+
+</div>
+
+
+<script
+    type="module"
+    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"
+></script>
+
+
+<script>
+
+const photos =
+    document.getElementById("photos");
+
+const uploadArea =
+    document.getElementById("uploadArea");
+
+const fileCount =
+    document.getElementById("fileCount");
+
+const createButton =
+    document.getElementById("createButton");
+
+const statusMessage =
+    document.getElementById("statusMessage");
+
+const progressBar =
+    document.getElementById("progressBar");
+
+const viewerCard =
+    document.getElementById("viewerCard");
+
+const modelViewer =
+    document.getElementById("modelViewer");
+
+const downloadCard =
+    document.getElementById("downloadCard");
+
+const downloadList =
+    document.getElementById("downloadList");
+
+const scanIdElement =
+    document.getElementById("scanId");
+
+
+let selectedFiles = [];
+
+let currentScanId = null;
+
+
+/* =========================================================
+   BILDER
+========================================================= */
+
+function isImage(file) {
+
+    return [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ].includes(file.type);
 }
 
 
-function readJSON(
-    file,
-    fallback = {}
-) {
+photos.addEventListener(
+    "change",
+    () => {
 
-    try {
-
-        return JSON.parse(
-            fs.readFileSync(
-                file,
-                "utf8"
+        selectedFiles =
+            Array.from(
+                photos.files
             )
-        );
+            .filter(isImage)
+            .slice(0, 100);
 
-    } catch {
-
-        return fallback;
+        updateFileCount();
     }
-}
+);
 
 
-// ============================================================
-// STATUS
-// ============================================================
+/* =========================================================
+   DRAG & DROP
+========================================================= */
 
-function getStatusFile(
-    scanId
-) {
+uploadArea.addEventListener(
+    "dragover",
+    event => {
 
-    return path.join(
-        SCANS_DIR,
-        scanId,
-        "status.json"
-    );
-}
+        event.preventDefault();
+
+        uploadArea.classList.add(
+            "drag"
+        );
+    }
+);
 
 
-function updateStatus(
-    scanId,
-    data
-) {
+uploadArea.addEventListener(
+    "dragleave",
+    () => {
 
-    const file =
-        getStatusFile(
-            scanId
+        uploadArea.classList.remove(
+            "drag"
+        );
+    }
+);
+
+
+uploadArea.addEventListener(
+    "drop",
+    event => {
+
+        event.preventDefault();
+
+        uploadArea.classList.remove(
+            "drag"
         );
 
-    const previous =
-        readJSON(
-            file,
-            {}
-        );
+        selectedFiles =
+            Array.from(
+                event.dataTransfer.files
+            )
+            .filter(isImage)
+            .slice(0, 100);
 
-    writeJSON(
-        file,
-        {
-            ...previous,
-            ...data,
-            updated:
-                new Date()
-                    .toISOString()
-        }
-    );
+        updateFileCount();
+    }
+);
+
+
+/* =========================================================
+   DATEIANZAHL
+========================================================= */
+
+function updateFileCount() {
+
+    const count =
+        selectedFiles.length;
+
+    if (count === 0) {
+
+        fileCount.textContent =
+            "Noch keine Fotos ausgewählt.";
+
+        createButton.disabled =
+            true;
+
+        return;
+    }
+
+    fileCount.textContent =
+        `${count} Foto${count === 1 ? "" : "s"} ausgewählt.`;
+
+    createButton.disabled =
+        count < 3;
 }
 
 
-// ============================================================
-// PROGRAMM AUSFÜHREN
-// ============================================================
+/* =========================================================
+   SCAN STARTEN
+========================================================= */
 
-function run(
-    command,
-    args,
-    cwd
-) {
-
-    return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
-
-            console.log("");
-            console.log(
-                "========================================"
-            );
-            console.log(
-                "PROGRAMM STARTEN"
-            );
-            console.log(
-                "COMMAND:",
-                command
-            );
-            console.log(
-                "ARGUMENTE:",
-                args.join(" ")
-            );
-            console.log(
-                "========================================"
-            );
+createButton.addEventListener(
+    "click",
+    startScan
+);
 
 
-            const child =
-                spawn(
-                    command,
-                    args,
-                    {
-
-                        cwd,
-
-                        env:
-                            process.env,
-
-                        stdio: [
-                            "ignore",
-                            "pipe",
-                            "pipe"
-                        ]
-                    }
-                );
-
-
-            child.stdout.on(
-                "data",
-                data => {
-
-                    console.log(
-                        data.toString()
-                    );
-                }
-            );
-
-
-            child.stderr.on(
-                "data",
-                data => {
-
-                    console.error(
-                        data.toString()
-                    );
-                }
-            );
-
-
-            child.on(
-                "error",
-                error => {
-
-                    console.error(
-                        "PROCESS ERROR:"
-                    );
-
-                    console.error(
-                        error
-                    );
-
-                    reject(
-                        error
-                    );
-                }
-            );
-
-
-            child.on(
-                "close",
-                code => {
-
-                    console.log(
-                        `${command} beendet mit Code ${code}`
-                    );
-
-                    if (
-                        code === 0
-                    ) {
-
-                        resolve();
-
-                    } else {
-
-                        reject(
-                            new Error(
-                                `${command} beendet mit Fehlercode ${code}`
-                            )
-                        );
-                    }
-                }
-            );
-        }
-    );
-}
-
-
-// ============================================================
-// DATEIEN SUCHEN
-// ============================================================
-
-function findFiles(
-    directory
-) {
+async function startScan() {
 
     if (
-        !fs.existsSync(
-            directory
-        )
+        selectedFiles.length < 3
     ) {
 
-        return [];
+        setError(
+            "Bitte mindestens 3 Fotos auswählen."
+        );
+
+        return;
     }
 
 
-    const result = [];
+    createButton.disabled =
+        true;
 
 
-    function scan(
-        current
-    ) {
-
-        const entries =
-            fs.readdirSync(
-                current,
-                {
-                    withFileTypes:
-                        true
-                }
-            );
+    viewerCard.style.display =
+        "none";
 
 
-        for (
-            const entry of entries
-        ) {
-
-            const fullPath =
-                path.join(
-                    current,
-                    entry.name
-                );
+    downloadCard.style.display =
+        "none";
 
 
-            if (
-                entry.isDirectory()
-            ) {
-
-                scan(
-                    fullPath
-                );
-
-            } else {
-
-                result.push(
-                    path.relative(
-                        directory,
-                        fullPath
-                    )
-                );
-            }
-        }
-    }
+    downloadList.innerHTML =
+        "";
 
 
-    scan(
-        directory
+    scanIdElement.textContent =
+        "";
+
+
+    setProgress(5);
+
+    setStatus(
+        "Fotos werden hochgeladen..."
     );
 
 
-    return result;
-}
+    const formData =
+        new FormData();
 
 
-// ============================================================
-// 3D-MODELL ERSTELLEN
-// ============================================================
+    for (
+        const file of selectedFiles
+    ) {
 
-async function createModel(
-    scanId
-) {
-
-    const scanDir =
-        path.join(
-            SCANS_DIR,
-            scanId
+        formData.append(
+            "photos",
+            file
         );
-
-    const imagesDir =
-        path.join(
-            scanDir,
-            "images"
-        );
-
-    const databasePath =
-        path.join(
-            scanDir,
-            "database.db"
-        );
-
-    const sparseDir =
-        path.join(
-            scanDir,
-            "sparse"
-        );
-
-    const denseDir =
-        path.join(
-            scanDir,
-            "dense"
-        );
-
-    const texturedDir =
-        path.join(
-            denseDir,
-            "textured"
-        );
+    }
 
 
     try {
 
-        // ====================================================
-        // START
-        // ====================================================
+        /*
+         * WICHTIG:
+         * Der Server verwendet /api/upload.
+         */
 
-        updateStatus(
-            scanId,
-            {
-
-                state:
-                    "processing",
-
-                step:
-                    "COLMAP wird gestartet",
-
-                progress:
-                    1
-            }
-        );
+        const response =
+            await fetch(
+                "/api/upload",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
 
 
-        // ====================================================
-        // FEATURE EXTRACTION
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Bilder analysieren",
-
-                progress:
-                    5
-            }
-        );
+        const text =
+            await response.text();
 
 
-        await run(
-            COLMAP,
-            [
-
-                "feature_extractor",
-
-                "--database_path",
-                databasePath,
-
-                "--image_path",
-                imagesDir,
-
-                "--ImageReader.single_camera",
-                "1",
-
-                "--FeatureExtraction.use_gpu",
-                "0",
-
-                "--SiftExtraction.max_num_features",
-                "8192"
-            ],
-
-            scanDir
-        );
+        let data;
 
 
-        // ====================================================
-        // MATCHING
-        // ====================================================
+        try {
 
-        updateStatus(
-            scanId,
-            {
+            data =
+                JSON.parse(text);
 
-                step:
-                    "Bilder vergleichen",
-
-                progress:
-                    15
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "exhaustive_matcher",
-
-                "--database_path",
-                databasePath,
-
-                "--FeatureMatching.use_gpu",
-                "0"
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // MAPPER
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Kamera-Positionen berechnen",
-
-                progress:
-                    30
-            }
-        );
-
-
-        fs.mkdirSync(
-            sparseDir,
-            {
-                recursive:
-                    true
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "mapper",
-
-                "--database_path",
-                databasePath,
-
-                "--image_path",
-                imagesDir,
-
-                "--output_path",
-                sparseDir
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // SPARSE MODEL SUCHEN
-        // ====================================================
-
-        const sparseModels =
-            fs
-                .readdirSync(
-                    sparseDir,
-                    {
-                        withFileTypes:
-                            true
-                    }
-                )
-                .filter(
-                    entry =>
-                        entry.isDirectory()
-                );
-
-
-        if (
-            sparseModels.length === 0
-        ) {
+        } catch {
 
             throw new Error(
-                "COLMAP konnte kein 3D-Modell aus den Fotos erstellen."
+                `Server antwortete mit HTTP ${response.status}.`
             );
         }
 
 
-        const sparseModel =
-            path.join(
-                sparseDir,
-                sparseModels[0].name
-            );
-
-
-        // ====================================================
-        // IMAGE UNDISTORTER
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Bilder für die 3D-Berechnung vorbereiten",
-
-                progress:
-                    40
-            }
-        );
-
-
-        fs.mkdirSync(
-            denseDir,
-            {
-                recursive:
-                    true
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "image_undistorter",
-
-                "--image_path",
-                imagesDir,
-
-                "--input_path",
-                sparseModel,
-
-                "--output_path",
-                denseDir,
-
-                "--output_type",
-                "COLMAP",
-
-                "--max_image_size",
-                "3000"
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // PATCH MATCH
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Tiefeninformationen berechnen",
-
-                progress:
-                    50
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "patch_match_stereo",
-
-                "--workspace_path",
-                denseDir,
-
-                "--workspace_format",
-                "COLMAP",
-
-                "--PatchMatchStereo.geom_consistency",
-                "true"
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // STEREO FUSION
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "3D-Punktwolke erzeugen",
-
-                progress:
-                    62
-            }
-        );
-
-
-        const fusedPath =
-            path.join(
-                denseDir,
-                "fused.ply"
-            );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "stereo_fusion",
-
-                "--workspace_path",
-                denseDir,
-
-                "--workspace_format",
-                "COLMAP",
-
-                "--input_type",
-                "geometric",
-
-                "--output_path",
-                fusedPath
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // POISSON MESH
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "3D-Netz erstellen",
-
-                progress:
-                    72
-            }
-        );
-
-
-        const meshPath =
-            path.join(
-                denseDir,
-                "mesh.ply"
-            );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "poisson_mesher",
-
-                "--input_path",
-                fusedPath,
-
-                "--output_path",
-                meshPath
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // TEXTUR
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Fototextur auf das Modell legen",
-
-                progress:
-                    82
-            }
-        );
-
-
-        fs.mkdirSync(
-            texturedDir,
-            {
-                recursive:
-                    true
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "mesh_texturer",
-
-                "--workspace_path",
-                denseDir,
-
-                "--input_path",
-                meshPath,
-
-                "--output_path",
-                texturedDir
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // TEXTURIERTES MESH
-        // ====================================================
-
-        const texturedMesh =
-            path.join(
-                texturedDir,
-                "mesh.ply"
-            );
-
-
         if (
-            !fs.existsSync(
-                texturedMesh
-            )
+            !response.ok
         ) {
 
             throw new Error(
-                "COLMAP hat kein texturiertes Mesh erzeugt."
+                data.error ||
+                "Upload fehlgeschlagen."
             );
         }
 
 
-        // ====================================================
-        // GLB
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Browser-Modell erstellen",
-
-                progress:
-                    92
-            }
-        );
-
-
-        const glbPath =
-            path.join(
-                scanDir,
-                "model.glb"
-            );
-
-
-        await run(
-            ASSIMP,
-            [
-
-                "export",
-
-                texturedMesh,
-
-                glbPath
-            ],
-
-            scanDir
-        );
-
-
         if (
-            !fs.existsSync(
-                glbPath
-            )
+            !data.scanId
         ) {
 
             throw new Error(
-                "Assimp konnte keine GLB-Datei erstellen."
+                "Der Server hat keine Scan-ID zurückgegeben."
             );
         }
 
 
-        // ====================================================
-        // FERTIG
-        // ====================================================
+        currentScanId =
+            data.scanId;
 
-        const files =
-            findFiles(
-                scanDir
-            )
-            .filter(
-                file =>
-                    !file.startsWith(
-                        "images/"
-                    )
+
+        scanIdElement.textContent =
+            "Scan-ID: " +
+            currentScanId;
+
+
+        setProgress(10);
+
+
+        setStatus(
+            `Upload fertig. ${data.photos} Fotos werden verarbeitet...`
+        );
+
+
+        pollStatus();
+
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            error
+        );
+
+
+        setError(
+            error.message
+        );
+
+
+        createButton.disabled =
+            false;
+    }
+}
+
+
+/* =========================================================
+   STATUS ABFRAGEN
+========================================================= */
+
+async function pollStatus() {
+
+    if (
+        !currentScanId
+    ) {
+
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/api/status/${encodeURIComponent(currentScanId)}`
             );
 
 
-        updateStatus(
-            scanId,
-            {
+        const text =
+            await response.text();
 
-                state:
-                    "finished",
 
-                step:
-                    "Fertig",
+        let data;
 
-                progress:
-                    100,
 
-                files,
+        try {
 
-                model:
-                    "model.glb"
-            }
+            data =
+                JSON.parse(text);
+
+        } catch {
+
+            throw new Error(
+                `Status-Server antwortete mit HTTP ${response.status}.`
+            );
+        }
+
+
+        if (
+            !response.ok
+        ) {
+
+            throw new Error(
+                data.error ||
+                "Status konnte nicht gelesen werden."
+            );
+        }
+
+
+        /*
+         * SERVER:
+         *
+         * state
+         * step
+         * progress
+         */
+
+        setStatus(
+            data.step ||
+            "Berechnung läuft..."
         );
 
 
-        console.log(
-            "========================================"
+        setProgress(
+            data.progress || 0
         );
 
-        console.log(
-            "SCAN FERTIG:",
-            scanId
-        );
 
-        console.log(
-            "========================================"
+        if (
+            data.state ===
+            "finished"
+        ) {
+
+            showFinished(
+                data
+            );
+
+            return;
+        }
+
+
+        if (
+            data.state ===
+            "error"
+        ) {
+
+            setError(
+                data.error ||
+                "Die 3D-Berechnung ist fehlgeschlagen."
+            );
+
+            createButton.disabled =
+                false;
+
+            return;
+        }
+
+
+        setTimeout(
+            pollStatus,
+            3000
         );
 
 
@@ -1025,524 +873,232 @@ async function createModel(
     ) {
 
         console.error(
-            "========================================"
-        );
-
-        console.error(
-            "REKONSTRUKTION FEHLER"
-        );
-
-        console.error(
             error
         );
 
-        console.error(
-            "========================================"
+
+        setError(
+            error.message
         );
 
 
-        updateStatus(
-            scanId,
-            {
-
-                state:
-                    "error",
-
-                step:
-                    "Fehler",
-
-                progress:
-                    0,
-
-                error:
-                    error.message ||
-                    String(error)
-            }
+        setTimeout(
+            pollStatus,
+            5000
         );
     }
 }
 
 
-// ============================================================
-// UPLOAD
-// ============================================================
+/* =========================================================
+   FERTIG
+========================================================= */
 
-app.post(
-    "/api/upload",
-    (req, res, next) => {
+function showFinished(
+    data
+) {
 
-        const scanId =
-            crypto
-                .randomBytes(8)
-                .toString("hex");
-
-
-        const scanDir =
-            path.join(
-                SCANS_DIR,
-                scanId
-            );
+    setProgress(
+        100
+    );
 
 
-        const imagesDir =
-            path.join(
-                scanDir,
-                "images"
-            );
+    setSuccess(
+        "✅ 3D-Modell ist fertig!"
+    );
 
 
-        fs.mkdirSync(
-            imagesDir,
-            {
-                recursive:
-                    true
-            }
-        );
+    const files =
+        Array.isArray(
+            data.files
+        )
+            ? data.files
+            : [];
 
 
-        req.scanId =
-            scanId;
-
-        req.scanImagesDir =
-            imagesDir;
-
-
-        upload.array(
-            "photos",
-            100
-        )(
-            req,
-            res,
-            error => {
-
-                if (error) {
-
-                    return next(
-                        error
-                    );
-                }
-
-
-                try {
-
-                    const photoCount =
-                        req.files
-                            ? req.files.length
-                            : 0;
-
-
-                    if (
-                        photoCount < 2
-                    ) {
-
-                        return res
-                            .status(400)
-                            .json({
-
-                                error:
-                                    "Bitte mindestens 2 Fotos hochladen."
-                            });
-                    }
-
-
-                    writeJSON(
-                        path.join(
-                            scanDir,
-                            "settings.json"
-                        ),
-                        {
-
-                            photos:
-                                photoCount,
-
-                            textureTarget:
-                                30000,
-
-                            textureMinimum:
-                                10000,
-
-                            maximumTriangles:
-                                750000000,
-
-                            created:
-                                new Date()
-                                    .toISOString()
-                        }
-                    );
-
-
-                    writeJSON(
-                        path.join(
-                            scanDir,
-                            "status.json"
-                        ),
-                        {
-
-                            state:
-                                "queued",
-
-                            step:
-                                "Warte auf Verarbeitung",
-
-                            progress:
-                                0,
-
-                            photos:
-                                photoCount
-                        }
-                    );
-
-
-                    res.json({
-
-                        success:
-                            true,
-
-                        scanId,
-
-                        photos:
-                            photoCount
-                    });
-
-
-                    // Verarbeitung im Hintergrund starten
-                    createModel(
-                        scanId
-                    );
-                }
-
-
-                catch (
-                    error
-                ) {
-
-                    next(
-                        error
-                    );
-                }
-            }
-        );
-    }
-);
-
-
-// ============================================================
-// STATUS
-// ============================================================
-
-app.get(
-    "/api/status/:id",
-    (req, res) => {
-
-        const scanId =
-            req.params.id;
-
-
-        const file =
-            getStatusFile(
-                scanId
-            );
-
-
-        if (
-            !fs.existsSync(
+    const model =
+        data.model ||
+        files.find(
+            file =>
                 file
-            )
-        ) {
-
-            return res
-                .status(404)
-                .json({
-
-                    error:
-                        "Scan nicht gefunden."
-                });
-        }
-
-
-        res.json(
-            readJSON(
-                file
-            )
+                    .toLowerCase()
+                    .endsWith(
+                        ".glb"
+                    )
         );
+
+
+    if (
+        model
+    ) {
+
+        const modelPath =
+            model
+                .split("/")
+                .map(
+                    part =>
+                        encodeURIComponent(
+                            part
+                        )
+                )
+                .join("/");
+
+
+        const modelUrl =
+            `/api/download/` +
+            `${encodeURIComponent(currentScanId)}/` +
+            modelPath;
+
+
+        console.log(
+            "MODELL:",
+            modelUrl
+        );
+
+
+        modelViewer.src =
+            modelUrl;
+
+
+        viewerCard.style.display =
+            "block";
     }
-);
 
 
-// ============================================================
-// DOWNLOAD
-// ============================================================
-
-app.get(
-    "/api/download/:id/{*file}",
-    (req, res) => {
-
-        const scanId =
-            req.params.id;
+    downloadList.innerHTML =
+        "";
 
 
-        const requestedFile =
-            req.params.file;
+    for (
+        const file of files
+    ) {
 
-
-        if (
-            !requestedFile
-        ) {
-
-            return res
-                .status(400)
-                .send(
-                    "Datei fehlt."
-                );
-        }
-
-
-        const scanDir =
-            path.resolve(
-                SCANS_DIR,
-                scanId
+        const button =
+            document.createElement(
+                "a"
             );
 
 
         const filePath =
-            path.resolve(
-                scanDir,
-                requestedFile
-            );
-
-
-        // Schutz gegen ../
-        if (
-            !filePath.startsWith(
-                scanDir +
-                path.sep
-            )
-        ) {
-
-            return res
-                .status(403)
-                .send(
-                    "Zugriff verweigert."
-                );
-        }
-
-
-        if (
-            !fs.existsSync(
-                filePath
-            ) ||
-            !fs.statSync(
-                filePath
-            ).isFile()
-        ) {
-
-            return res
-                .status(404)
-                .send(
-                    "Datei nicht gefunden."
-                );
-        }
-
-
-        res.download(
-            filePath
-        );
-    }
-);
-
-
-// ============================================================
-// SCAN-INFOS
-// ============================================================
-
-app.get(
-    "/api/scan/:id",
-    (req, res) => {
-
-        const scanId =
-            req.params.id;
-
-
-        const scanDir =
-            path.join(
-                SCANS_DIR,
-                scanId
-            );
-
-
-        if (
-            !fs.existsSync(
-                scanDir
-            )
-        ) {
-
-            return res
-                .status(404)
-                .json({
-
-                    error:
-                        "Scan nicht gefunden."
-                });
-        }
-
-
-        const settings =
-            readJSON(
-                path.join(
-                    scanDir,
-                    "settings.json"
+            file
+                .split("/")
+                .map(
+                    part =>
+                        encodeURIComponent(
+                            part
+                        )
                 )
-            );
+                .join("/");
 
 
-        const status =
-            readJSON(
-                path.join(
-                    scanDir,
-                    "status.json"
-                )
-            );
+        button.className =
+            "download-button";
 
 
-        res.json({
+        button.href =
+            `/api/download/` +
+            `${encodeURIComponent(currentScanId)}/` +
+            filePath;
 
-            scanId,
 
-            settings,
+        button.download =
+            file
+                .split("/")
+                .pop();
 
-            status
-        });
+
+        button.textContent =
+            "⬇️ " +
+            file
+                .split("/")
+                .pop();
+
+
+        downloadList.appendChild(
+            button
+        );
     }
-);
 
 
-// ============================================================
-// HEALTH
-// ============================================================
+    if (
+        files.length > 0
+    ) {
 
-app.get(
-    "/api/health",
-    (req, res) => {
-
-        res.json({
-
-            ok:
-                true,
-
-            colmap:
-                COLMAP,
-
-            assimp:
-                ASSIMP,
-
-            colmapExists:
-                fs.existsSync(
-                    COLMAP
-                ),
-
-            assimpExists:
-                fs.existsSync(
-                    ASSIMP
-                ),
-
-            node:
-                process.version
-        });
+        downloadCard.style.display =
+            "block";
     }
-);
 
 
-// ============================================================
-// FEHLER
-// ============================================================
-
-app.use(
-    (
-        error,
-        req,
-        res,
-        next
-    ) => {
-
-        console.error(
-            "SERVER FEHLER:"
-        );
-
-        console.error(
-            error
-        );
+    createButton.disabled =
+        false;
+}
 
 
-        res
-            .status(500)
-            .json({
+/* =========================================================
+   UI
+========================================================= */
 
-                error:
-                    error.message ||
-                    "Unbekannter Serverfehler."
-            });
-    }
-);
+function setStatus(
+    message
+) {
+
+    statusMessage.className =
+        "status-message";
+
+    statusMessage.textContent =
+        message;
+}
 
 
-// ============================================================
-// SERVER
-// ============================================================
+function setError(
+    message
+) {
 
-app.listen(
-    PORT,
-    "0.0.0.0",
-    () => {
+    statusMessage.className =
+        "status-message error";
 
-        console.log("");
-        console.log(
-            "========================================"
-        );
-        console.log(
-            "       ULTRA 3D SCANNER SERVER"
-        );
-        console.log(
-            "========================================"
-        );
+    statusMessage.textContent =
+        "❌ " +
+        message;
+}
 
-        console.log(
-            "Port:",
-            PORT
-        );
 
-        console.log(
-            "COLMAP:",
-            COLMAP
-        );
+function setSuccess(
+    message
+) {
 
-        console.log(
-            "COLMAP vorhanden:",
-            fs.existsSync(
-                COLMAP
+    statusMessage.className =
+        "status-message success";
+
+    statusMessage.textContent =
+        message;
+}
+
+
+function setProgress(
+    value
+) {
+
+    value =
+        Number(value) || 0;
+
+
+    value =
+        Math.max(
+            0,
+            Math.min(
+                100,
+                value
             )
         );
 
-        console.log(
-            "Assimp:",
-            ASSIMP
-        );
 
-        console.log(
-            "Assimp vorhanden:",
-            fs.existsSync(
-                ASSIMP
-            )
-        );
+    progressBar.style.width =
+        `${value}%`;
+}
 
-        console.log(
-            "Node:",
-            process.version
-        );
+</script>
 
-        console.log(
-            "========================================"
-        );
-
-        console.log("");
-    }
-);
+</body>
+</html>
+```
