@@ -1,3 +1,4 @@
+```javascript
 const express = require("express");
 const multer = require("multer");
 const fs = require("fs");
@@ -7,976 +8,624 @@ const { spawn } = require("child_process");
 
 const app = express();
 
+const PORT = process.env.PORT || 10000;
+const ROOT = __dirname;
+const SCANS_DIR = path.join(ROOT, "scans");
 
-// ============================================================
-// KONFIGURATION
-// ============================================================
+fs.mkdirSync(SCANS_DIR, { recursive: true });
 
-const PORT =
-    process.env.PORT || 10000;
+app.use(express.json());
+app.use(express.static(ROOT));
 
-const ROOT =
-    __dirname;
+/* =========================================
+   ALICEVISION
+========================================= */
 
-const SCANS_DIR =
-    path.join(
-        ROOT,
-        "scans"
-    );
+const AV = {
+    cameraInit: "aliceVision_cameraInit",
+    featureExtraction: "aliceVision_featureExtraction",
+    imageMatching: "aliceVision_imageMatching",
+    featureMatching: "aliceVision_featureMatching",
+    sfm: "aliceVision_incrementalSfM",
+    depthMap: "aliceVision_depthMap",
+    depthMapFilter: "aliceVision_depthMapFilter",
+    meshing: "aliceVision_meshing",
+    meshFiltering: "aliceVision_meshFiltering",
+    texturing: "aliceVision_texturing"
+};
 
+/* =========================================
+   UPLOAD
+========================================= */
 
-// ============================================================
-// PROGRAMME
-// ============================================================
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, req.scanImagesDir);
+    },
 
-const COLMAP =
-    process.env.COLMAP_PATH ||
-    "/usr/local/bin/colmap";
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
 
-const ASSIMP =
-    process.env.ASSIMP_PATH ||
-    "/usr/bin/assimp";
+        const filename =
+            Date.now() +
+            "-" +
+            crypto.randomBytes(5).toString("hex") +
+            ext;
 
-
-// ============================================================
-// ORDNER
-// ============================================================
-
-fs.mkdirSync(
-    SCANS_DIR,
-    {
-        recursive: true
+        cb(null, filename);
     }
-);
+});
 
+const upload = multer({
+    storage,
 
-// ============================================================
-// EXPRESS
-// ============================================================
+    limits: {
+        files: 100,
+        fileSize: 100 * 1024 * 1024
+    },
 
-app.use(
-    express.json()
-);
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp"
+        ];
 
-app.use(
-    express.static(ROOT)
-);
+        const ext =
+            path.extname(file.originalname).toLowerCase();
 
+        if (!allowed.includes(ext)) {
+            return cb(
+                new Error(
+                    "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
+                )
+            );
+        }
 
-// ============================================================
-// MULTER
-// ============================================================
+        cb(null, true);
+    }
+});
 
-const storage =
-    multer.diskStorage({
+/* =========================================
+   HILFSFUNKTIONEN
+========================================= */
 
-        destination:
-            (req, file, cb) => {
-
-                cb(
-                    null,
-                    req.scanImagesDir
-                );
-            },
-
-        filename:
-            (req, file, cb) => {
-
-                const extension =
-                    path
-                        .extname(
-                            file.originalname
-                        )
-                        .toLowerCase();
-
-                const filename =
-                    Date.now() +
-                    "-" +
-                    crypto
-                        .randomBytes(5)
-                        .toString("hex") +
-                    extension;
-
-                cb(
-                    null,
-                    filename
-                );
-            }
-    });
-
-
-const upload =
-    multer({
-
-        storage,
-
-        limits: {
-
-            files: 100,
-
-            fileSize:
-                100 *
-                1024 *
-                1024
-        },
-
-        fileFilter:
-            (req, file, cb) => {
-
-                const allowed = [
-                    ".jpg",
-                    ".jpeg",
-                    ".png",
-                    ".webp"
-                ];
-
-                const extension =
-                    path
-                        .extname(
-                            file.originalname
-                        )
-                        .toLowerCase();
-
-                if (
-                    !allowed.includes(
-                        extension
-                    )
-                ) {
-
-                    return cb(
-                        new Error(
-                            "Nur JPG, JPEG, PNG und WEBP sind erlaubt."
-                        )
-                    );
-                }
-
-                cb(
-                    null,
-                    true
-                );
-            }
-    });
-
-
-// ============================================================
-// JSON
-// ============================================================
-
-function writeJSON(
-    file,
-    data
-) {
-
+function writeJSON(file, data) {
     fs.writeFileSync(
         file,
-        JSON.stringify(
-            data,
-            null,
-            2
-        )
+        JSON.stringify(data, null, 2)
     );
 }
 
-
-function readJSON(
-    file,
-    fallback = {}
-) {
-
+function readJSON(file, fallback = {}) {
     try {
-
         return JSON.parse(
-            fs.readFileSync(
-                file,
-                "utf8"
-            )
+            fs.readFileSync(file, "utf8")
         );
-
     } catch {
-
         return fallback;
     }
 }
 
-
-// ============================================================
-// STATUS
-// ============================================================
-
-function getStatusFile(
-    scanId
-) {
-
+function statusFile(id) {
     return path.join(
         SCANS_DIR,
-        scanId,
+        id,
         "status.json"
     );
 }
 
+function updateStatus(id, data) {
+    const file = statusFile(id);
 
-function updateStatus(
-    scanId,
-    data
-) {
+    const old =
+        readJSON(file, {});
 
-    const file =
-        getStatusFile(
-            scanId
-        );
-
-    const previous =
-        readJSON(
-            file,
-            {}
-        );
-
-    writeJSON(
-        file,
-        {
-            ...previous,
-            ...data,
-            updated:
-                new Date()
-                    .toISOString()
-        }
-    );
+    writeJSON(file, {
+        ...old,
+        ...data,
+        updated:
+            new Date().toISOString()
+    });
 }
 
+/* =========================================
+   PROGRAMM AUSFÜHREN
+========================================= */
 
-// ============================================================
-// PROGRAMM AUSFÜHREN
-// ============================================================
+function run(command, args, cwd) {
+    return new Promise((resolve, reject) => {
 
-function run(
-    command,
-    args,
-    cwd
-) {
+        console.log("");
+        console.log("=================================");
+        console.log("START:", command);
+        console.log("ARGS:", args.join(" "));
+        console.log("=================================");
 
-    return new Promise(
-        (
-            resolve,
-            reject
-        ) => {
+        const child = spawn(
+            command,
+            args,
+            {
+                cwd,
+                env: process.env,
+                stdio: [
+                    "ignore",
+                    "pipe",
+                    "pipe"
+                ]
+            }
+        );
 
-            console.log("");
-            console.log(
-                "========================================"
-            );
-            console.log(
-                "PROGRAMM STARTEN"
-            );
-            console.log(
-                "COMMAND:",
-                command
-            );
-            console.log(
-                "ARGUMENTE:",
-                args.join(" ")
-            );
-            console.log(
-                "========================================"
-            );
+        child.stdout.on(
+            "data",
+            data => {
+                console.log(
+                    data.toString()
+                );
+            }
+        );
 
+        child.stderr.on(
+            "data",
+            data => {
+                console.error(
+                    data.toString()
+                );
+            }
+        );
 
-            const child =
-                spawn(
-                    command,
-                    args,
-                    {
-
-                        cwd,
-
-                        env:
-                            process.env,
-
-                        stdio: [
-                            "ignore",
-                            "pipe",
-                            "pipe"
-                        ]
-                    }
+        child.on(
+            "error",
+            error => {
+                console.error(
+                    "PROCESS ERROR:",
+                    error
                 );
 
+                reject(error);
+            }
+        );
 
-            child.stdout.on(
-                "data",
-                data => {
+        child.on(
+            "close",
+            code => {
 
-                    console.log(
-                        data.toString()
-                    );
-                }
-            );
+                console.log(
+                    command +
+                    " beendet mit Code " +
+                    code
+                );
 
-
-            child.stderr.on(
-                "data",
-                data => {
-
-                    console.error(
-                        data.toString()
-                    );
-                }
-            );
-
-
-            child.on(
-                "error",
-                error => {
-
-                    console.error(
-                        "PROCESS ERROR:"
-                    );
-
-                    console.error(
-                        error
-                    );
-
+                if (code === 0) {
+                    resolve();
+                } else {
                     reject(
-                        error
+                        new Error(
+                            command +
+                            " beendet mit Fehlercode " +
+                            code
+                        )
                     );
                 }
-            );
-
-
-            child.on(
-                "close",
-                code => {
-
-                    console.log(
-                        `${command} beendet mit Code ${code}`
-                    );
-
-                    if (
-                        code === 0
-                    ) {
-
-                        resolve();
-
-                    } else {
-
-                        reject(
-                            new Error(
-                                `${command} beendet mit Fehlercode ${code}`
-                            )
-                        );
-                    }
-                }
-            );
-        }
-    );
+            }
+        );
+    });
 }
 
+/* =========================================
+   DATEIEN FINDEN
+========================================= */
 
-// ============================================================
-// DATEIEN SUCHEN
-// ============================================================
+function findFiles(directory) {
 
-function findFiles(
-    directory
-) {
-
-    if (
-        !fs.existsSync(
-            directory
-        )
-    ) {
-
+    if (!fs.existsSync(directory)) {
         return [];
     }
 
-
     const result = [];
 
-
-    function scan(
-        current
-    ) {
+    function scan(dir) {
 
         const entries =
             fs.readdirSync(
-                current,
+                dir,
                 {
-                    withFileTypes:
-                        true
+                    withFileTypes: true
                 }
             );
 
+        for (const entry of entries) {
 
-        for (
-            const entry of entries
-        ) {
-
-            const fullPath =
+            const full =
                 path.join(
-                    current,
+                    dir,
                     entry.name
                 );
 
-
-            if (
-                entry.isDirectory()
-            ) {
-
-                scan(
-                    fullPath
-                );
-
+            if (entry.isDirectory()) {
+                scan(full);
             } else {
-
                 result.push(
                     path.relative(
                         directory,
-                        fullPath
+                        full
                     )
                 );
             }
         }
     }
 
-
-    scan(
-        directory
-    );
-
+    scan(directory);
 
     return result;
 }
 
+/* =========================================
+   3D-MODELL ERSTELLEN
+========================================= */
 
-// ============================================================
-// 3D-MODELL ERSTELLEN
-// ============================================================
-
-async function createModel(
-    scanId
-) {
+async function createModel(id) {
 
     const scanDir =
         path.join(
             SCANS_DIR,
-            scanId
+            id
         );
 
-    const imagesDir =
+    const images =
         path.join(
             scanDir,
             "images"
         );
 
-    const databasePath =
+    const camera =
         path.join(
             scanDir,
-            "database.db"
+            "camera"
         );
 
-    const sparseDir =
+    const features =
         path.join(
             scanDir,
-            "sparse"
+            "features"
         );
 
-    const denseDir =
+    const matches =
         path.join(
             scanDir,
-            "dense"
+            "matches"
         );
 
-    const texturedDir =
+    const sfm =
         path.join(
-            denseDir,
-            "textured"
+            scanDir,
+            "sfm"
         );
 
+    const depth =
+        path.join(
+            scanDir,
+            "depth"
+        );
+
+    const mesh =
+        path.join(
+            scanDir,
+            "mesh"
+        );
+
+    const texture =
+        path.join(
+            scanDir,
+            "texture"
+        );
 
     try {
 
-        // ====================================================
-        // START
-        // ====================================================
+        /* 1. Kamera */
 
-        updateStatus(
-            scanId,
-            {
+        updateStatus(id, {
+            state: "processing",
+            step: "Kameras erkennen",
+            progress: 5
+        });
 
-                state:
-                    "processing",
-
-                step:
-                    "COLMAP wird gestartet",
-
-                progress:
-                    1
-            }
-        );
-
-
-        // ====================================================
-        // FEATURE EXTRACTION
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Bilder analysieren",
-
-                progress:
-                    5
-            }
-        );
-
+        fs.mkdirSync(camera, {
+            recursive: true
+        });
 
         await run(
-            COLMAP,
+            AV.cameraInit,
             [
+                "--imageFolder",
+                images,
 
-                "feature_extractor",
+                "--output",
+                path.join(
+                    camera,
+                    "cameras.sfm"
+                )
+            ],
+            scanDir
+        );
 
-                "--database_path",
-                databasePath,
+        /* 2. Features */
 
-                "--image_path",
-                imagesDir,
+        updateStatus(id, {
+            step: "Bildmerkmale analysieren",
+            progress: 15
+        });
 
-                "--ImageReader.single_camera",
-                "1",
+        fs.mkdirSync(features, {
+            recursive: true
+        });
 
-                "--FeatureExtraction.use_gpu",
-                "0",
+        await run(
+            AV.featureExtraction,
+            [
+                "--input",
+                path.join(
+                    camera,
+                    "cameras.sfm"
+                ),
 
-                "--SiftExtraction.max_num_features",
+                "--output",
+                features,
+
+                "--describerTypes",
+                "sift"
+            ],
+            scanDir
+        );
+
+        /* 3. Bildvergleich */
+
+        updateStatus(id, {
+            step: "Fotos vergleichen",
+            progress: 25
+        });
+
+        fs.mkdirSync(matches, {
+            recursive: true
+        });
+
+        await run(
+            AV.imageMatching,
+            [
+                "--input",
+                path.join(
+                    camera,
+                    "cameras.sfm"
+                ),
+
+                "--featuresFolders",
+                features,
+
+                "--output",
+                path.join(
+                    matches,
+                    "imageMatches.txt"
+                )
+            ],
+            scanDir
+        );
+
+        await run(
+            AV.featureMatching,
+            [
+                "--input",
+                path.join(
+                    camera,
+                    "cameras.sfm"
+                ),
+
+                "--featuresFolders",
+                features,
+
+                "--imagePairsList",
+                path.join(
+                    matches,
+                    "imageMatches.txt"
+                ),
+
+                "--output",
+                matches
+            ],
+            scanDir
+        );
+
+        /* 4. 3D-Kameras */
+
+        updateStatus(id, {
+            step: "3D-Kamera-Positionen berechnen",
+            progress: 40
+        });
+
+        fs.mkdirSync(sfm, {
+            recursive: true
+        });
+
+        await run(
+            AV.sfm,
+            [
+                "--input",
+                path.join(
+                    camera,
+                    "cameras.sfm"
+                ),
+
+                "--featuresFolders",
+                features,
+
+                "--matchesFolders",
+                matches,
+
+                "--output",
+                path.join(
+                    sfm,
+                    "sfm.abc"
+                ),
+
+                "--outputViewsAndPoses",
+                path.join(
+                    sfm,
+                    "poses.sfm"
+                )
+            ],
+            scanDir
+        );
+
+        /* 5. Tiefenkarte */
+
+        updateStatus(id, {
+            step: "Tiefeninformationen berechnen",
+            progress: 55
+        });
+
+        fs.mkdirSync(depth, {
+            recursive: true
+        });
+
+        await run(
+            AV.depthMap,
+            [
+                "--input",
+                path.join(
+                    sfm,
+                    "sfm.abc"
+                ),
+
+                "--output",
+                depth,
+
+                "--downscale",
+                "2"
+            ],
+            scanDir
+        );
+
+        /* 6. Tiefenfilter */
+
+        updateStatus(id, {
+            step: "Tiefeninformationen filtern",
+            progress: 65
+        });
+
+        await run(
+            AV.depthMapFilter,
+            [
+                "--input",
+                path.join(
+                    sfm,
+                    "sfm.abc"
+                ),
+
+                "--depthMapFolder",
+                depth,
+
+                "--output",
+                depth
+            ],
+            scanDir
+        );
+
+        /* 7. Mesh */
+
+        updateStatus(id, {
+            step: "3D-Netz erstellen",
+            progress: 75
+        });
+
+        fs.mkdirSync(mesh, {
+            recursive: true
+        });
+
+        await run(
+            AV.meshing,
+            [
+                "--input",
+                path.join(
+                    sfm,
+                    "sfm.abc"
+                ),
+
+                "--depthMapFolder",
+                depth,
+
+                "--output",
+                path.join(
+                    mesh,
+                    "mesh.obj"
+                )
+            ],
+            scanDir
+        );
+
+        /* 8. Mesh verbessern */
+
+        updateStatus(id, {
+            step: "3D-Modell verbessern",
+            progress: 82
+        });
+
+        await run(
+            AV.meshFiltering,
+            [
+                "--input",
+                path.join(
+                    mesh,
+                    "mesh.obj"
+                ),
+
+                "--output",
+                path.join(
+                    mesh,
+                    "filtered.obj"
+                )
+            ],
+            scanDir
+        );
+
+        /* 9. Textur */
+
+        updateStatus(id, {
+            step: "Fototextur erstellen",
+            progress: 90
+        });
+
+        fs.mkdirSync(texture, {
+            recursive: true
+        });
+
+        await run(
+            AV.texturing,
+            [
+                "--input",
+                path.join(
+                    sfm,
+                    "sfm.abc"
+                ),
+
+                "--inputMesh",
+                path.join(
+                    mesh,
+                    "filtered.obj"
+                ),
+
+                "--output",
+                texture,
+
+                "--textureSide",
                 "8192"
             ],
-
             scanDir
         );
 
-
-        // ====================================================
-        // MATCHING
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Bilder vergleichen",
-
-                progress:
-                    15
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "exhaustive_matcher",
-
-                "--database_path",
-                databasePath,
-
-                "--FeatureMatching.use_gpu",
-                "0"
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // MAPPER
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Kamera-Positionen berechnen",
-
-                progress:
-                    30
-            }
-        );
-
-
-        fs.mkdirSync(
-            sparseDir,
-            {
-                recursive:
-                    true
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "mapper",
-
-                "--database_path",
-                databasePath,
-
-                "--image_path",
-                imagesDir,
-
-                "--output_path",
-                sparseDir
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // SPARSE MODEL SUCHEN
-        // ====================================================
-
-        const sparseModels =
-            fs
-                .readdirSync(
-                    sparseDir,
-                    {
-                        withFileTypes:
-                            true
-                    }
-                )
-                .filter(
-                    entry =>
-                        entry.isDirectory()
-                );
-
-
-        if (
-            sparseModels.length === 0
-        ) {
-
-            throw new Error(
-                "COLMAP konnte kein 3D-Modell aus den Fotos erstellen."
-            );
-        }
-
-
-        const sparseModel =
-            path.join(
-                sparseDir,
-                sparseModels[0].name
-            );
-
-
-        // ====================================================
-        // IMAGE UNDISTORTER
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Bilder für die 3D-Berechnung vorbereiten",
-
-                progress:
-                    40
-            }
-        );
-
-
-        fs.mkdirSync(
-            denseDir,
-            {
-                recursive:
-                    true
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "image_undistorter",
-
-                "--image_path",
-                imagesDir,
-
-                "--input_path",
-                sparseModel,
-
-                "--output_path",
-                denseDir,
-
-                "--output_type",
-                "COLMAP",
-
-                "--max_image_size",
-                "3000"
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // PATCH MATCH
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Tiefeninformationen berechnen",
-
-                progress:
-                    50
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "patch_match_stereo",
-
-                "--workspace_path",
-                denseDir,
-
-                "--workspace_format",
-                "COLMAP",
-
-                "--PatchMatchStereo.geom_consistency",
-                "true"
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // STEREO FUSION
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "3D-Punktwolke erzeugen",
-
-                progress:
-                    62
-            }
-        );
-
-
-        const fusedPath =
-            path.join(
-                denseDir,
-                "fused.ply"
-            );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "stereo_fusion",
-
-                "--workspace_path",
-                denseDir,
-
-                "--workspace_format",
-                "COLMAP",
-
-                "--input_type",
-                "geometric",
-
-                "--output_path",
-                fusedPath
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // POISSON MESH
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "3D-Netz erstellen",
-
-                progress:
-                    72
-            }
-        );
-
-
-        const meshPath =
-            path.join(
-                denseDir,
-                "mesh.ply"
-            );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "poisson_mesher",
-
-                "--input_path",
-                fusedPath,
-
-                "--output_path",
-                meshPath
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // TEXTUR
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Fototextur auf das Modell legen",
-
-                progress:
-                    82
-            }
-        );
-
-
-        fs.mkdirSync(
-            texturedDir,
-            {
-                recursive:
-                    true
-            }
-        );
-
-
-        await run(
-            COLMAP,
-            [
-
-                "mesh_texturer",
-
-                "--workspace_path",
-                denseDir,
-
-                "--input_path",
-                meshPath,
-
-                "--output_path",
-                texturedDir
-            ],
-
-            scanDir
-        );
-
-
-        // ====================================================
-        // TEXTURIERTES MESH
-        // ====================================================
-
-        const texturedMesh =
-            path.join(
-                texturedDir,
-                "mesh.ply"
-            );
-
-
-        if (
-            !fs.existsSync(
-                texturedMesh
-            )
-        ) {
-
-            throw new Error(
-                "COLMAP hat kein texturiertes Mesh erzeugt."
-            );
-        }
-
-
-        // ====================================================
-        // GLB
-        // ====================================================
-
-        updateStatus(
-            scanId,
-            {
-
-                step:
-                    "Browser-Modell erstellen",
-
-                progress:
-                    92
-            }
-        );
-
-
-        const glbPath =
-            path.join(
-                scanDir,
-                "model.glb"
-            );
-
-
-        await run(
-            ASSIMP,
-            [
-
-                "export",
-
-                texturedMesh,
-
-                glbPath
-            ],
-
-            scanDir
-        );
-
-
-        if (
-            !fs.existsSync(
-                glbPath
-            )
-        ) {
-
-            throw new Error(
-                "Assimp konnte keine GLB-Datei erstellen."
-            );
-        }
-
-
-        // ====================================================
-        // FERTIG
-        // ====================================================
+        /* Fertig */
 
         const files =
-            findFiles(
-                scanDir
-            )
+            findFiles(scanDir)
             .filter(
                 file =>
                     !file.startsWith(
@@ -984,105 +633,54 @@ async function createModel(
                     )
             );
 
-
-        updateStatus(
-            scanId,
-            {
-
-                state:
-                    "finished",
-
-                step:
-                    "Fertig",
-
-                progress:
-                    100,
-
-                files,
-
-                model:
-                    "model.glb"
-            }
-        );
-
+        updateStatus(id, {
+            state: "finished",
+            step: "Fertig",
+            progress: 100,
+            files
+        });
 
         console.log(
-            "========================================"
+            "3D-SCAN FERTIG:",
+            id
         );
 
-        console.log(
-            "SCAN FERTIG:",
-            scanId
-        );
-
-        console.log(
-            "========================================"
-        );
-
-
-    } catch (
-        error
-    ) {
+    } catch (error) {
 
         console.error(
-            "========================================"
-        );
-
-        console.error(
-            "REKONSTRUKTION FEHLER"
-        );
-
-        console.error(
+            "3D-SCAN FEHLER:",
             error
         );
 
-        console.error(
-            "========================================"
-        );
-
-
-        updateStatus(
-            scanId,
-            {
-
-                state:
-                    "error",
-
-                step:
-                    "Fehler",
-
-                progress:
-                    0,
-
-                error:
-                    error.message ||
-                    String(error)
-            }
-        );
+        updateStatus(id, {
+            state: "error",
+            step: "Fehler",
+            progress: 0,
+            error:
+                error.message ||
+                String(error)
+        });
     }
 }
 
-
-// ============================================================
-// UPLOAD
-// ============================================================
+/* =========================================
+   UPLOAD
+========================================= */
 
 app.post(
     "/api/upload",
     (req, res, next) => {
 
-        const scanId =
+        const id =
             crypto
                 .randomBytes(8)
                 .toString("hex");
 
-
         const scanDir =
             path.join(
                 SCANS_DIR,
-                scanId
+                id
             );
-
 
         const imagesDir =
             path.join(
@@ -1090,22 +688,15 @@ app.post(
                 "images"
             );
 
-
         fs.mkdirSync(
             imagesDir,
             {
-                recursive:
-                    true
+                recursive: true
             }
         );
 
-
-        req.scanId =
-            scanId;
-
         req.scanImagesDir =
             imagesDir;
-
 
         upload.array(
             "photos",
@@ -1116,209 +707,132 @@ app.post(
             error => {
 
                 if (error) {
-
-                    return next(
-                        error
-                    );
+                    return next(error);
                 }
 
+                const count =
+                    req.files
+                        ? req.files.length
+                        : 0;
 
-                try {
+                if (count < 2) {
 
-                    const photoCount =
-                        req.files
-                            ? req.files.length
-                            : 0;
+                    return res
+                        .status(400)
+                        .json({
+                            error:
+                                "Mindestens 2 Fotos erforderlich."
+                        });
+                }
 
-
-                    if (
-                        photoCount < 2
-                    ) {
-
-                        return res
-                            .status(400)
-                            .json({
-
-                                error:
-                                    "Bitte mindestens 2 Fotos hochladen."
-                            });
+                writeJSON(
+                    path.join(
+                        scanDir,
+                        "settings.json"
+                    ),
+                    {
+                        photos: count,
+                        textureTarget: 30000,
+                        maximumTriangles:
+                            750000000,
+                        created:
+                            new Date()
+                                .toISOString()
                     }
+                );
 
+                writeJSON(
+                    path.join(
+                        scanDir,
+                        "status.json"
+                    ),
+                    {
+                        state: "queued",
+                        step:
+                            "Warte auf Verarbeitung",
+                        progress: 0,
+                        photos: count
+                    }
+                );
 
-                    writeJSON(
-                        path.join(
-                            scanDir,
-                            "settings.json"
-                        ),
-                        {
+                res.json({
+                    success: true,
+                    scanId: id,
+                    photos: count
+                });
 
-                            photos:
-                                photoCount,
-
-                            textureTarget:
-                                30000,
-
-                            textureMinimum:
-                                10000,
-
-                            maximumTriangles:
-                                750000000,
-
-                            created:
-                                new Date()
-                                    .toISOString()
-                        }
-                    );
-
-
-                    writeJSON(
-                        path.join(
-                            scanDir,
-                            "status.json"
-                        ),
-                        {
-
-                            state:
-                                "queued",
-
-                            step:
-                                "Warte auf Verarbeitung",
-
-                            progress:
-                                0,
-
-                            photos:
-                                photoCount
-                        }
-                    );
-
-
-                    res.json({
-
-                        success:
-                            true,
-
-                        scanId,
-
-                        photos:
-                            photoCount
-                    });
-
-
-                    // Verarbeitung im Hintergrund starten
-                    createModel(
-                        scanId
-                    );
-                }
-
-
-                catch (
-                    error
-                ) {
-
-                    next(
-                        error
-                    );
-                }
+                createModel(id);
             }
         );
     }
 );
 
-
-// ============================================================
-// STATUS
-// ============================================================
+/* =========================================
+   STATUS
+========================================= */
 
 app.get(
     "/api/status/:id",
     (req, res) => {
 
-        const scanId =
-            req.params.id;
-
-
         const file =
-            getStatusFile(
-                scanId
+            statusFile(
+                req.params.id
             );
 
-
-        if (
-            !fs.existsSync(
-                file
-            )
-        ) {
+        if (!fs.existsSync(file)) {
 
             return res
                 .status(404)
                 .json({
-
                     error:
                         "Scan nicht gefunden."
                 });
         }
 
-
         res.json(
-            readJSON(
-                file
-            )
+            readJSON(file)
         );
     }
 );
 
-
-// ============================================================
-// DOWNLOAD
-// ============================================================
+/* =========================================
+   DOWNLOAD
+========================================= */
 
 app.get(
     "/api/download/:id/{*file}",
     (req, res) => {
 
-        const scanId =
+        const id =
             req.params.id;
 
-
-        const requestedFile =
+        const requested =
             req.params.file;
 
-
-        if (
-            !requestedFile
-        ) {
-
+        if (!requested) {
             return res
                 .status(400)
-                .send(
-                    "Datei fehlt."
-                );
+                .send("Datei fehlt.");
         }
-
 
         const scanDir =
             path.resolve(
                 SCANS_DIR,
-                scanId
+                id
             );
-
 
         const filePath =
             path.resolve(
                 scanDir,
-                requestedFile
+                requested
             );
 
-
-        // Schutz gegen ../
         if (
             !filePath.startsWith(
-                scanDir +
-                path.sep
+                scanDir + path.sep
             )
         ) {
-
             return res
                 .status(403)
                 .send(
@@ -1326,16 +840,10 @@ app.get(
                 );
         }
 
-
         if (
-            !fs.existsSync(
-                filePath
-            ) ||
-            !fs.statSync(
-                filePath
-            ).isFile()
+            !fs.existsSync(filePath) ||
+            !fs.statSync(filePath).isFile()
         ) {
-
             return res
                 .status(404)
                 .send(
@@ -1343,151 +851,78 @@ app.get(
                 );
         }
 
-
-        res.download(
-            filePath
-        );
+        res.download(filePath);
     }
 );
 
-
-// ============================================================
-// SCAN-INFOS
-// ============================================================
-
-app.get(
-    "/api/scan/:id",
-    (req, res) => {
-
-        const scanId =
-            req.params.id;
-
-
-        const scanDir =
-            path.join(
-                SCANS_DIR,
-                scanId
-            );
-
-
-        if (
-            !fs.existsSync(
-                scanDir
-            )
-        ) {
-
-            return res
-                .status(404)
-                .json({
-
-                    error:
-                        "Scan nicht gefunden."
-                });
-        }
-
-
-        const settings =
-            readJSON(
-                path.join(
-                    scanDir,
-                    "settings.json"
-                )
-            );
-
-
-        const status =
-            readJSON(
-                path.join(
-                    scanDir,
-                    "status.json"
-                )
-            );
-
-
-        res.json({
-
-            scanId,
-
-            settings,
-
-            status
-        });
-    }
-);
-
-
-// ============================================================
-// HEALTH
-// ============================================================
+/* =========================================
+   HEALTH
+========================================= */
 
 app.get(
     "/api/health",
     (req, res) => {
 
+        const binaries = {};
+
+        for (
+            const [name, command]
+            of Object.entries(AV)
+        ) {
+
+            binaries[name] = {
+                command,
+                available:
+                    commandAvailable(command)
+            };
+        }
+
         res.json({
-
-            ok:
-                true,
-
-            colmap:
-                COLMAP,
-
-            assimp:
-                ASSIMP,
-
-            colmapExists:
-                fs.existsSync(
-                    COLMAP
-                ),
-
-            assimpExists:
-                fs.existsSync(
-                    ASSIMP
-                ),
-
-            node:
-                process.version
+            ok: true,
+            node: process.version,
+            alicevision: binaries
         });
     }
 );
 
+function commandAvailable(command) {
 
-// ============================================================
-// FEHLER
-// ============================================================
+    const locations = [
+        `/usr/local/bin/${command}`,
+        `/usr/bin/${command}`,
+        `/usr/local/AliceVision/bin/${command}`,
+        `/opt/AliceVision/bin/${command}`
+    ];
+
+    return locations.some(
+        file =>
+            fs.existsSync(file)
+    );
+}
+
+/* =========================================
+   FEHLER
+========================================= */
 
 app.use(
-    (
-        error,
-        req,
-        res,
-        next
-    ) => {
+    (error, req, res, next) => {
 
         console.error(
-            "SERVER FEHLER:"
-        );
-
-        console.error(
+            "SERVER FEHLER:",
             error
         );
 
-
-        res
-            .status(500)
-            .json({
-
-                error:
-                    error.message ||
-                    "Unbekannter Serverfehler."
-            });
+        res.status(500).json({
+            error:
+                error.message ||
+                "Unbekannter Serverfehler."
+        });
     }
 );
 
-
-// ============================================================
-// SERVER
-// ============================================================
+/* =========================================
+   SERVER START
+========================================= */
 
 app.listen(
     PORT,
@@ -1499,50 +934,22 @@ app.listen(
             "========================================"
         );
         console.log(
-            "       ULTRA 3D SCANNER SERVER"
+            "       ALICEVISION 3D SCANNER"
         );
         console.log(
             "========================================"
         );
-
         console.log(
             "Port:",
             PORT
         );
-
-        console.log(
-            "COLMAP:",
-            COLMAP
-        );
-
-        console.log(
-            "COLMAP vorhanden:",
-            fs.existsSync(
-                COLMAP
-            )
-        );
-
-        console.log(
-            "Assimp:",
-            ASSIMP
-        );
-
-        console.log(
-            "Assimp vorhanden:",
-            fs.existsSync(
-                ASSIMP
-            )
-        );
-
         console.log(
             "Node:",
             process.version
         );
-
         console.log(
             "========================================"
         );
-
-        console.log("");
     }
 );
+```
